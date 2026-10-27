@@ -1,5 +1,6 @@
 import os
 
+
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "local-development-only-change-me")
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "sqlite:///carbon_dev.db")
