@@ -1,6 +1,6 @@
 import traceback
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
-from app.data_collection.calculations import EmissionCalculator
+from app.data_collection.calculations import EmissionCalculator, calculate_emissions, assign_scope
 from app.data_collection.csv_import import CsvImporter
 from app.data_collection.exceptions import (
     DataCollectionError,
@@ -148,9 +148,9 @@ def live_calculate():
         return jsonify({"error": "Valid factor_id or factor_kg_co2e is required"}), 400
 
     try:
-        co2e = EmissionCalculator.calculate(float(quantity), float(factor_value))
+        co2e = calculate_emissions(float(quantity), float(factor_value))
         if scope is None and category:
-            scope = EmissionCalculator.assign_scope(category)
+            scope = assign_scope(category)
         return jsonify({
             "quantity": float(quantity),
             "factor_kg_co2e": float(factor_value),

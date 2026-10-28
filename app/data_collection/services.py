@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from app.data_collection.calculations import EmissionCalculator
+from app.data_collection.calculations import EmissionCalculator, calculate_emissions, assign_scope as _assign_scope
 from app.data_collection.exceptions import (
     CompanyIsolationError,
     RecordOwnershipError,
@@ -52,8 +52,7 @@ def create_activity_record(data: dict, user_id: str | None = None) -> ActivityRe
     factor_kg_co2e = data.get('factor_kg_co2e')
     if factor_kg_co2e is None:
         factor_kg_co2e = factor.kg_co2e_per_unit
-    co2e = EmissionCalculator.calculate(quantity, float(factor_kg_co2e))
-
+    co2e = calculate_emissions(quantity, float(factor_kg_co2e))
     # 5. Period / Date resolution & validation
     period_start = data.get('period_start')
     period_end = data.get('period_end')
@@ -93,7 +92,7 @@ def create_activity_record(data: dict, user_id: str | None = None) -> ActivityRe
     elif factor.scope is not None:
         scope = factor.scope
     else:
-        scope = EmissionCalculator.assign_scope(category)
+        scope = _assign_scope(category)
 
     # 8. Create and persist record
     record = ActivityRecord(
@@ -161,7 +160,7 @@ def update_activity_record(record_id: str, data: dict, user_id: str) -> Activity
         record.quantity = new_qty
         factor = db.session.get(EmissionFactor, record.factor_id)
         if factor:
-            record.co2e_kg = EmissionCalculator.calculate(new_qty, factor.kg_co2e_per_unit)
+            record.co2e_kg = calculate_emissions(new_qty, factor.kg_co2e_per_unit)
 
     # Update unit if provided and valid
     if 'unit' in data:

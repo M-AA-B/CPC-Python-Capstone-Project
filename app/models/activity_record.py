@@ -30,6 +30,7 @@ class ActivityRecord(db.Model):
     calculated_co2e = db.synonym('co2e_kg')
 
     def __init__(self, **kwargs):
+        """Constructor: Initializes state and handles attribute aliases (Hometask 1)."""
         if 'user_id' in kwargs and 'created_by' not in kwargs:
             kwargs['created_by'] = kwargs.pop('user_id')
         if 'emission_factor_id' in kwargs and 'factor_id' not in kwargs:
@@ -40,8 +41,36 @@ class ActivityRecord(db.Model):
             kwargs['co2e_kg'] = kwargs.pop('calculated_co2e')
         super().__init__(**kwargs)
 
+    # --- Explicit Accessor & Mutator Methods (Hometask 1 Encapsulation) ---
+    def get_quantity(self) -> float:
+        """Accessor (getter) for quantity."""
+        return self.quantity
+
+    def set_quantity(self, value: float) -> None:
+        """Mutator (setter) for quantity with input validation."""
+        val = float(value)
+        if val < 0:
+            raise ValueError("Activity quantity cannot be negative.")
+        self.quantity = val
+        if self.factor and hasattr(self.factor, 'kg_co2e_per_unit'):
+            self.co2e_kg = round(self.quantity * self.factor.kg_co2e_per_unit, 2)
+
+    def get_unit(self) -> str:
+        """Accessor (getter) for unit."""
+        return self.unit or ""
+
+    def set_unit(self, value: str) -> None:
+        """Mutator (setter) for unit."""
+        if not value:
+            raise ValueError("Unit cannot be empty.")
+        self.unit = str(value)
+
+    def get_co2e_kg(self) -> float:
+        """Accessor (getter) for calculated co2e_kg."""
+        return self.co2e_kg
+
     def is_valid(self) -> bool:
-        """Validates that quantity is non-negative and dates are consistent."""
+        """Validates that quantity is non-negative and dates are consistent (UML S1)."""
         if self.quantity is None or self.quantity < 0:
             return False
         if self.period_start and self.period_end and self.period_start > self.period_end:
@@ -49,10 +78,8 @@ class ActivityRecord(db.Model):
         return True
 
     def update_quantity(self, new_val: float) -> None:
-        """Updates quantity and recalculates CO2e emissions in real-time."""
-        self.quantity = float(new_val)
-        if self.factor and hasattr(self.factor, 'kg_co2e_per_unit'):
-            self.co2e_kg = round(self.quantity * self.factor.kg_co2e_per_unit, 2)
+        """Updates quantity and recalculates CO2e emissions in real-time (UML S1)."""
+        self.set_quantity(new_val)
 
     def to_dict(self) -> dict:
         """Serializes record to dictionary for JSON output."""
