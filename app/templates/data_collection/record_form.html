@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width: 1000px; margin: 2rem auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+    <h1 style="margin-bottom: 0.5rem; color: #1e3a8a;">S1 · Data Collection & Calculation</h1>
+    <p style="color: #4b5563; margin-bottom: 1.5rem;">
+        Capture company activity data, calculate verified GHG emissions in real-time, and manage activity records.
+    </p>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div style="padding: 1rem; margin-bottom: 1.5rem; border-radius: 6px; font-weight: 500; background: {% if category == 'success' %}#d1fae5{% else %}#fee2e2{% endif %}; color: {% if category == 'success' %}#065f46{% else %}#991b1b{% endif %};">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+        <!-- Manual Entry Card -->
+        <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <h3 style="margin-top: 0; color: #111827; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem;">New Activity Record</h3>
+            <form method="POST" action="{{ url_for('data.handle_form_submission') }}">
+                <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">User ID</label>
+                        <input type="text" name="current_user_id" value="user-123" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">Company ID</label>
+                        <input type="text" name="company_id" value="123e4567-e89b-12d3-a456-426614174000" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">Department ID</label>
+                        <input type="text" name="department_id" value="123e4567-e89b-12d3-a456-426614174001" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">Category</label>
+                        <select name="category" id="catSelect" onchange="onCategoryChange()" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+                            <option value="electricity" selected>Electricity (Scope 2)</option>
+                            <option value="natural_gas">Natural Gas (Scope 1)</option>
+                            <option value="company_vehicles">Company Vehicles (Scope 1)</option>
+                            <option value="business_travel">Business Travel (Scope 3)</option>
+                            <option value="waste">Waste Disposal (Scope 3)</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">Quantity / Value</label>
+                        <input type="number" step="any" name="quantity" id="qtyInput" value="1000" oninput="updateRealtimePreview()" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">Unit</label>
+                        <input type="text" name="unit" id="unitInput" value="kWh" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">Period Start</label>
+                        <input type="date" name="period_start" value="2026-10-01" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">Period End</label>
+                        <input type="date" name="period_end" value="2026-10-31" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">Emission Factor ID</label>
+                        <input type="number" name="factor_id" id="factorIdInput" value="1" oninput="updateRealtimePreview()" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">Factor kg CO2e / unit</label>
+                        <input type="number" step="any" name="factor_kg_co2e" id="factorValInput" value="0.42" oninput="updateRealtimePreview()" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+                        <input type="hidden" name="factor_unit" id="factorUnitInput" value="kWh">
+                    </div>
+                </div>
+
+                <!-- Real-time calculation banner (Hometask 2) -->
+                <div id="realtimeBanner" style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: #166534; font-size: 0.875rem; font-weight: 600;">Real-Time Emission Preview:</span>
+                    <strong id="previewCO2e" style="font-size: 1.125rem; color: #15803d;">420.00 kg CO2e</strong>
+                </div>
+
+                <button type="submit" style="width: 100%; padding: 0.75rem; background: #059669; color: white; border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer;">
+                    Submit & Calculate
+                </button>
+            </form>
+        </div>
+
+        <!-- Bulk CSV Import Card (S1 FR2) -->
+        <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column;">
+            <h3 style="margin-top: 0; color: #111827; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem;">Batch CSV Upload</h3>
+            <p style="font-size: 0.875rem; color: #6b7280; margin-bottom: 1rem;">
+                Upload multiple activity records at once. Required headers: <code>department_id, emission_factor_id, activity_value, unit, date, scope</code>.
+            </p>
+            <form method="POST" action="{{ url_for('data.upload_csv') }}" enctype="multipart/form-data" style="margin-top: auto;">
+                <div style="margin-bottom: 1rem;">
+                    <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 0.5rem;">Select CSV File</label>
+                    <input type="file" name="file" accept=".csv" required style="width: 100%; padding: 0.5rem; border: 1px dashed #9ca3af; border-radius: 4px; box-sizing: border-box;">
+                </div>
+                <input type="hidden" name="current_user_id" value="user-123">
+                <button type="submit" style="width: 100%; padding: 0.75rem; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                    Upload CSV File
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Searchable & Sortable Activity Records Table (S1 FR8 & Hometask 3) -->
+    <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0; color: #111827;">Recorded Activities</h3>
+            <span style="font-size: 0.875rem; color: #6b7280;">Total records: <strong>{{ records|length if records else 0 }}</strong></span>
+        </div>
+
+        {% if records and records|length > 0 %}
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem;">
+                    <thead>
+                        <tr style="background: #f9fafb; border-bottom: 2px solid #e5e7eb; color: #374151;">
+                            <th style="padding: 0.75rem;">Date</th>
+                            <th style="padding: 0.75rem;">Category</th>
+                            <th style="padding: 0.75rem;">Scope</th>
+                            <th style="padding: 0.75rem;">Quantity</th>
+                            <th style="padding: 0.75rem;">Unit</th>
+                            <th style="padding: 0.75rem;">Calculated CO2e</th>
+                            <th style="padding: 0.75rem;">User</th>
+                            <th style="padding: 0.75rem; text-align: right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in records %}
+                            <tr style="border-bottom: 1px solid #e5e7eb;">
+                                <td style="padding: 0.75rem;">{{ r.period_start or r.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td style="padding: 0.75rem; text-transform: capitalize;">{{ r.category }}</td>
+                                <td style="padding: 0.75rem;"><span style="background: #e0e7ff; color: #3730a3; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600;">Scope {{ r.scope or 1 }}</span></td>
+                                <td style="padding: 0.75rem;">{{ r.quantity }}</td>
+                                <td style="padding: 0.75rem;">{{ r.unit }}</td>
+                                <td style="padding: 0.75rem; font-weight: bold; color: #059669;">{{ r.co2e_kg }} kg</td>
+                                <td style="padding: 0.75rem; color: #6b7280;">{{ r.created_by }}</td>
+                                <td style="padding: 0.75rem; text-align: right;">
+                                    <button onclick="deleteRecord('{{ r.id }}')" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p style="color: #6b7280; font-style: italic; margin-top: 1rem;">No activity records saved yet. Submit a new activity or upload a CSV to see data output here.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function updateRealtimePreview() {
+    const qty = parseFloat(document.getElementById('qtyInput').value) || 0;
+    const factor = parseFloat(document.getElementById('factorValInput').value) || 0;
+    const total = (qty * factor).toFixed(2);
+    document.getElementById('previewCO2e').innerText = total + ' kg CO2e';
+}
+
+function onCategoryChange() {
+    const cat = document.getElementById('catSelect').value;
+    const unitInput = document.getElementById('unitInput');
+    const factorValInput = document.getElementById('factorValInput');
+    const factorUnitInput = document.getElementById('factorUnitInput');
+
+    if (cat === 'electricity') {
+        unitInput.value = 'kWh';
+        factorValInput.value = '0.42';
+        factorUnitInput.value = 'kWh';
+    } else if (cat === 'natural_gas') {
+        unitInput.value = 'm3';
+        factorValInput.value = '2.03';
+        factorUnitInput.value = 'm3';
+    } else if (cat === 'company_vehicles') {
+        unitInput.value = 'liters';
+        factorValInput.value = '2.68';
+        factorUnitInput.value = 'liters';
+    } else if (cat === 'business_travel') {
+        unitInput.value = 'km';
+        factorValInput.value = '0.18';
+        factorUnitInput.value = 'km';
+    } else if (cat === 'waste') {
+        unitInput.value = 'kg';
+        factorValInput.value = '0.52';
+        factorUnitInput.value = 'kg';
+    }
+    updateRealtimePreview();
+}
+
+async function deleteRecord(recordId) {
+    if (!confirm('Are you sure you want to delete this activity record?')) return;
+    try {
+        const res = await fetch(`/activities/api/records/${recordId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: 'user-123' })
+        });
+        if (res.ok) {
+            window.location.reload();
+        } else {
+            const err = await res.json();
+            alert('Error: ' + (err.error || 'Failed to delete record.'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e);
+    }
+}
+</script>
+{% endblock %}
