@@ -1,5 +1,76 @@
 {% extends "base.html" %}
+
 {% block content %}
-<h1>S2 — Analytics & Dashboard</h1>
-<p>Owner: Vanessa. Feature implementation pending.</p>
+<section class="dashboard">
+  <header class="dashboard__header">
+    <h1>Emissions Dashboard</h1>
+    <p>Explore emissions, compare trends and track reduction targets.</p>
+    <p><strong>Preview:</strong> Data is not connected yet.</p>
+  </header>
+
+  <!-- Filters will become functional when connected to analytics. -->
+  <fieldset disabled>
+    <legend>Filter emissions — coming soon</legend>
+
+    <label for="start-date">Start date</label>
+    <input type="date" id="start-date" name="start_date">
+
+    <label for="end-date">End date</label>
+    <input type="date" id="end-date" name="end_date">
+
+    <label for="category">Category</label>
+    <select id="category" name="category">
+      <option value="">All categories</option>
+    </select>
+
+    <button type="button">Apply filters</button>
+  </fieldset>
+
+  <!-- Missing data is shown as unavailable, rather than zero. -->
+  <section class="dashboard__stats" aria-label="Emissions summary">
+    <article class="stat-card">
+      <h2>Total emissions</h2>
+      <p>— kg CO₂e</p>
+      <small>No data connected</small>
+    </article>
+
+    <!-- <article class="stat-card">
+      <h2>Highest-emitting category</h2>
+      <p>—</p>
+      <small>No data connected</small>
+    </article> -->
+
+    <!-- <article class="stat-card">
+      <h2>Monthly change</h2>
+      <p>—</p>
+      <small>No comparison available</small>
+    </article> -->
+
+    <article class="stat-card">
+      <h2>Carbon Score</h2>
+      <p>— / 100</p>
+      <small>No target set</small>
+    </article>
+  </section>
+
+  <section class="dashboard__charts" aria-label="Emissions charts">
+    <article class="chart-card">
+      <h2>Monthly emissions trend</h2>
+      <p>Monthly chart will appear here.</p>
+    </article>
+
+    <article class="chart-card">
+      <h2>Emissions by category</h2>
+      <p>Category chart will appear here.</p>
+    </article>
+  </section>
+
+  <section class="dashboard__target">
+    <h2>Reduction target</h2>
+    <p>No target set.</p>
+    <button type="button" disabled>Set target — coming soon</button>
+  </section>
+
+  <button type="button" disabled>Export CSV — coming soon</button>
+</section>
 {% endblock %}
