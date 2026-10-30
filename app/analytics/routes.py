@@ -6,9 +6,11 @@ from flask import current_app, render_template, request
 from app.extensions import db
 from app.models.company import Company
 from . import bp
+from .charts import build_monthly_chart, build_category_chart
 from .services import (
     get_emissions_summary,
     get_emissions_by_category,
+    get_monthly_emissions,
 )
 
 
@@ -18,6 +20,8 @@ def index():
     summary = None
     category_totals = []
     categories = []
+    monthly_chart = None
+    category_chart = None
     error = None
 
     filters = {
@@ -35,8 +39,6 @@ def index():
             company = db.session.get(Company, company_id)
 
     if company is not None:
-        # Keep every available category in the dropdown,
-        # even when the current filters return no records.
         categories = [
             item["category"]
             for item in get_emissions_by_category(company.id)
@@ -78,6 +80,16 @@ def index():
                     filters["category"],
                 )
 
+                monthly_totals = get_monthly_emissions(
+                    company.id,
+                    start_date,
+                    end_date,
+                    filters["category"],
+                )
+
+                monthly_chart = build_monthly_chart(monthly_totals)
+                category_chart = build_category_chart(category_totals)
+
     return render_template(
         "analytics/index.html",
         company=company,
@@ -86,4 +98,6 @@ def index():
         categories=categories,
         filters=filters,
         error=error,
+        monthly_chart=monthly_chart,
+        category_chart=category_chart,
     )

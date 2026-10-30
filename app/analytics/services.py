@@ -103,3 +103,44 @@ def get_emissions_by_category(
         }
         for row in results
     ]
+
+
+def get_monthly_emissions(
+    company_id, start_date=None, end_date=None, category=None
+):
+    """Group dated activity records by year and month."""
+    year = func.extract("year", ActivityRecord.period_start)
+    month = func.extract("month", ActivityRecord.period_start)
+
+    statement = (
+        select(
+            year.label("year"),
+            month.label("month"),
+            func.sum(ActivityRecord.co2e_kg).label("total_emissions"),
+        )
+        .select_from(ActivityRecord)
+        .join(
+            Department,
+            ActivityRecord.department_id == Department.id,
+        )
+        .where(
+            Department.company_id == company_id,
+            ActivityRecord.period_start.is_not(None),
+        )
+        .group_by(year, month)
+        .order_by(year, month)
+    )
+
+    statement = apply_filters(
+        statement, start_date, end_date, category
+    )
+
+    results = db.session.execute(statement).all()
+
+    return [
+        {
+            "month": f"{int(row.year):04d}-{int(row.month):02d}",
+            "total_emissions": float(row.total_emissions),
+        }
+        for row in results
+    ]   

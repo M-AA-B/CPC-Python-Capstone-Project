@@ -103,15 +103,34 @@
   </section>
 
   <section class="dashboard__charts" aria-label="Emissions charts">
-    <article class="chart-card">
-      <h2>Monthly emissions trend</h2>
-      <p>Monthly chart will appear here.</p>
-    </article>
+
+<article class="chart-card">
+  <h2>Monthly emissions trend</h2>
+
+  {% if error %}
+    <p>Correct the filters above to view the chart.</p>
+  {% elif monthly_chart %}
+    {{ monthly_chart | safe }}
+    <p>
+      Emissions are grouped by activity start month.
+      Months without dated records are omitted.
+    </p>
+  {% else %}
+    <p>No dated activity records match the selected filters.</p>
+  {% endif %}
+</article>
 
 <article class="chart-card">
   <h2>Emissions by category</h2>
 
-  {% if category_totals %}
+  {% if error %}
+    <p>Correct the filters above to view category results.</p>
+
+  {% elif category_totals %}
+    {% if category_chart %}
+      {{ category_chart | safe }}
+    {% endif %}
+
     <table>
       <thead>
         <tr>
@@ -124,9 +143,7 @@
         {% for item in category_totals %}
           <tr>
             <td>{{ item.category }}</td>
-            <td>
-              {{ "{:,.2f}".format(item.total_emissions) }}
-            </td>
+            <td>{{ "{:,.2f}".format(item.total_emissions) }}</td>
           </tr>
         {% endfor %}
       </tbody>
@@ -143,8 +160,9 @@
         Other categories share this total.
       {% endif %}
     </p>
+
   {% else %}
-    <p>No category data available.</p>
+    <p>No category data matches the selected filters.</p>
   {% endif %}
 </article>
     
