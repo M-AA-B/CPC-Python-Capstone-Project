@@ -1,6 +1,7 @@
 import os
+from datetime import date
 
-from flask import current_app, render_template
+from flask import current_app, render_template, request
 
 from app.extensions import db
 from app.models.company import Company
@@ -16,24 +17,73 @@ def index():
     company = None
     summary = None
     category_totals = []
+    categories = []
+    error = None
 
-    # Temporary company selection for local development.
-    # Later, S3's login will identify the user's company.
+    filters = {
+        "start_date": request.args.get("start_date", "").strip(),
+        "end_date": request.args.get("end_date", "").strip(),
+        "category": request.args.get("category", "").strip(),
+    }
+
+    # Temporary local development access.
+    # S3 will replace this with authenticated company access.
     if current_app.debug:
         company_id = os.getenv("ANALYTICS_DEV_COMPANY_ID")
 
         if company_id:
             company = db.session.get(Company, company_id)
 
-            if company is not None:
-                summary = get_emissions_summary(company.id)
-                category_totals = get_emissions_by_category(company.id)
+    if company is not None:
+        # Keep every available category in the dropdown,
+        # even when the current filters return no records.
+        categories = [
+            item["category"]
+            for item in get_emissions_by_category(company.id)
+        ]
+
+        try:
+            start_date = (
+                date.fromisoformat(filters["start_date"])
+                if filters["start_date"]
+                else None
+            )
+            end_date = (
+                date.fromisoformat(filters["end_date"])
+                if filters["end_date"]
+                else None
+            )
+        except ValueError:
+            error = "Enter valid dates in YYYY-MM-DD format."
+        else:
+            if start_date and end_date and start_date > end_date:
+                error = "Start date must be on or before end date."
+            elif (
+                filters["category"]
+                and filters["category"] not in categories
+            ):
+                error = "Select an available category."
+            else:
+                summary = get_emissions_summary(
+                    company.id,
+                    start_date,
+                    end_date,
+                    filters["category"],
+                )
+
+                category_totals = get_emissions_by_category(
+                    company.id,
+                    start_date,
+                    end_date,
+                    filters["category"],
+                )
 
     return render_template(
         "analytics/index.html",
         company=company,
         summary=summary,
         category_totals=category_totals,
+        categories=categories,
+        filters=filters,
+        error=error,
     )
-
-    

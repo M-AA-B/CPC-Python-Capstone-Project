@@ -5,26 +5,54 @@
   <header class="dashboard__header">
     <h1>Emissions Dashboard</h1>
     <p>Explore emissions, compare trends and track reduction targets.</p>
-    <p><strong>Preview:</strong> Data is not connected yet.</p>
+    <p><strong>Development:</strong> Showing local test data.</p>
   </header>
 
   <!-- Filters will become functional when connected to analytics. -->
-  <fieldset disabled>
-    <legend>Filter emissions — coming soon</legend>
+<form method="get" action="{{ url_for('analytics.index') }}">
+  <fieldset>
+    <legend>Filter emissions</legend>
 
     <label for="start-date">Start date</label>
-    <input type="date" id="start-date" name="start_date">
+    <input
+      type="date"
+      id="start-date"
+      name="start_date"
+      value="{{ filters.start_date }}"
+    >
 
     <label for="end-date">End date</label>
-    <input type="date" id="end-date" name="end_date">
+    <input
+      type="date"
+      id="end-date"
+      name="end_date"
+      value="{{ filters.end_date }}"
+    >
 
     <label for="category">Category</label>
     <select id="category" name="category">
       <option value="">All categories</option>
+
+      {% for category in categories %}
+        <option
+          value="{{ category }}"
+          {% if filters.category == category %}selected{% endif %}
+        >
+          {{ category }}
+        </option>
+      {% endfor %}
     </select>
 
-    <button type="button">Apply filters</button>
+    <button type="submit">Apply filters</button>
+    <a href="{{ url_for('analytics.index') }}">Clear filters</a>
   </fieldset>
+</form>
+
+<p>Dates filter by the activity period’s start date.</p>
+
+{% if error %}
+  <p role="alert">{{ error }}</p>
+{% endif %}
 
   <!-- Missing data is shown as unavailable, rather than zero. -->
   <section class="dashboard__stats" aria-label="Emissions summary">
@@ -36,9 +64,12 @@
       <small>
         {{ company.name }} · {{ summary.record_count }} activity records
       </small>
-    {% elif company is not none %}
+   {% elif error %}
       <p>— kg CO₂e</p>
-      <small>No activity records for {{ company.name }}</small>
+      <small>Correct the filters above to view results.</small>
+      {% elif company is not none %}
+      <p>— kg CO₂e</p>
+      <small>No activity records match these filters for {{ company.name }}.</small>
     {% else %}
       <p>— kg CO₂e</p>
       <small>No development company selected</small>

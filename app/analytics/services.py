@@ -1,11 +1,3 @@
-"""S2 — Analytics & Dashboard. Owner: Vanessa. Add business logic here."""
-from sqlalchemy import func, select
-
-from app.extensions import db
-from app.models.activity_record import ActivityRecord
-from app.models.department import Department
-
-
 """S2 — Analytics & Dashboard. Owner: Vanessa."""
 
 from sqlalchemy import func, select
@@ -15,8 +7,36 @@ from app.models.activity_record import ActivityRecord
 from app.models.department import Department
 
 
-def get_emissions_summary(company_id):
-    """Calculate total emissions for one company's departments."""
+def apply_filters(
+    statement, start_date=None, end_date=None, category=None
+):
+    """Filter records without changing stored data."""
+    if start_date is not None:
+        statement = statement.where(
+            ActivityRecord.period_start >= start_date
+        )
+
+    if end_date is not None:
+        statement = statement.where(
+            ActivityRecord.period_start <= end_date
+        )
+
+    if category:
+        normalised_category = func.coalesce(
+            func.nullif(func.trim(ActivityRecord.category), ""),
+            "Uncategorised",
+        )
+        statement = statement.where(
+            normalised_category == category
+        )
+
+    return statement
+
+
+def get_emissions_summary(
+    company_id, start_date=None, end_date=None, category=None
+):
+    """Calculate filtered emissions for one company's departments."""
     statement = (
         select(
             func.count(ActivityRecord.id),
@@ -30,7 +50,13 @@ def get_emissions_summary(company_id):
         .where(Department.company_id == company_id)
     )
 
-    record_count, total_emissions = db.session.execute(statement).one()
+    statement = apply_filters(
+        statement, start_date, end_date, category
+    )
+
+    record_count, total_emissions = db.session.execute(
+        statement
+    ).one()
 
     return {
         "record_count": record_count,
@@ -38,8 +64,10 @@ def get_emissions_summary(company_id):
     }
 
 
-def get_emissions_by_category(company_id):
-    """Group one company's saved emissions by category."""
+def get_emissions_by_category(
+    company_id, start_date=None, end_date=None, category_filter=None
+):
+    """Group one company's filtered emissions by category."""
     category = func.coalesce(
         func.nullif(func.trim(ActivityRecord.category), ""),
         "Uncategorised",
@@ -60,6 +88,10 @@ def get_emissions_by_category(company_id):
         .where(Department.company_id == company_id)
         .group_by(category)
         .order_by(total.desc(), category)
+    )
+
+    statement = apply_filters(
+        statement, start_date, end_date, category_filter
     )
 
     results = db.session.execute(statement).all()
