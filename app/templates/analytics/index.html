@@ -70,10 +70,46 @@
       <p>Monthly chart will appear here.</p>
     </article>
 
-    <article class="chart-card">
-      <h2>Emissions by category</h2>
-      <p>Category chart will appear here.</p>
-    </article>
+<article class="chart-card">
+  <h2>Emissions by category</h2>
+
+  {% if category_totals %}
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Category</th>
+          <th scope="col">Emissions (kg CO₂e)</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for item in category_totals %}
+          <tr>
+            <td>{{ item.category }}</td>
+            <td>
+              {{ "{:,.2f}".format(item.total_emissions) }}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <p>
+      Highest-emitting category:
+      <strong>{{ category_totals[0].category }}</strong>
+      ({{ "{:,.2f}".format(category_totals[0].total_emissions) }}
+      kg CO₂e).
+      {% if category_totals | length > 1
+            and category_totals[0].total_emissions
+                == category_totals[1].total_emissions %}
+        Other categories share this total.
+      {% endif %}
+    </p>
+  {% else %}
+    <p>No category data available.</p>
+  {% endif %}
+</article>
+    
   </section>
 
   <section class="dashboard__target">
