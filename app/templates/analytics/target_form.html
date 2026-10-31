@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="dashboard">
+  <h1>Set a reduction target</h1>
+  <p>Company: {{ company.name }}</p>
+  <p>
+    Compare equal numbers of complete calendar months.
+    The baseline period must finish before the target period starts.
+  </p>
+
+  {% if error %}
+    <p role="alert">{{ error }}</p>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('analytics.target_form') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <fieldset>
+      <legend>Baseline period</legend>
+
+      <p>
+        <label for="baseline-start">Start date</label>
+        <input
+          type="date"
+          id="baseline-start"
+          name="baseline_start"
+          value="{{ values.get('baseline_start', '') }}"
+          required
+        >
+      </p>
+
+      <p>
+        <label for="baseline-end">End date</label>
+        <input
+          type="date"
+          id="baseline-end"
+          name="baseline_end"
+          value="{{ values.get('baseline_end', '') }}"
+          required
+        >
+      </p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Target period</legend>
+
+      <p>
+        <label for="period-start">Start date</label>
+        <input
+          type="date"
+          id="period-start"
+          name="period_start"
+          value="{{ values.get('period_start', '') }}"
+          required
+        >
+      </p>
+
+      <p>
+        <label for="period-end">End date</label>
+        <input
+          type="date"
+          id="period-end"
+          name="period_end"
+          value="{{ values.get('period_end', '') }}"
+          required
+        >
+      </p>
+    </fieldset>
+
+    <p>
+      <label for="reduction-percent">Desired reduction (%)</label>
+      <input
+        type="number"
+        id="reduction-percent"
+        name="reduction_percent"
+        min="0.01"
+        max="100"
+        step="0.01"
+        value="{{ values.get('reduction_percent', '') }}"
+        required
+      >
+    </p>
+
+    <p>
+      <label>
+        <input
+          type="checkbox"
+          name="data_complete"
+          {% if values.get('data_complete') == 'on' %}checked{% endif %}
+        >
+        I confirm that both periods have complete activity data
+        covering the same departments, categories and emission scopes.
+      </label>
+    </p>
+
+    <p>
+      Leave this unchecked while collecting data.
+      The score becomes available after the target period ends,
+      both periods contain records, and completeness is confirmed.
+    </p>
+
+    <p>
+      Saving creates a new target. The dashboard displays the latest target.
+    </p>
+
+    <button type="submit">Save target</button>
+    <a href="{{ url_for('analytics.index') }}">Back to dashboard</a>
+  </form>
+</section>
+{% endblock %}

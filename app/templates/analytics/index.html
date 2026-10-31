@@ -95,30 +95,36 @@
       <small>No comparison available</small>
     </article> -->
 
-    <article class="stat-card">
-      <h2>Carbon Score</h2>
-      <p>— / 100</p>
-      <small>No target set</small>
-    </article>
-  </section>
+<article class="stat-card">
+  <h2>Carbon Score</h2>
 
-  <section class="dashboard__charts" aria-label="Emissions charts">
-
-<article class="chart-card">
-  <h2>Monthly emissions trend</h2>
-
-  {% if error %}
-    <p>Correct the filters above to view the chart.</p>
-  {% elif monthly_chart %}
-    {{ monthly_chart | safe }}
-    <p>
-      Emissions are grouped by activity start month.
-      Months without dated records are omitted.
-    </p>
+  {% if target_progress.available %}
+    <p>{{ "{:.1f}".format(target_progress.score) }} / 100</p>
+    <small>Progress towards the saved reduction target.</small>
   {% else %}
-    <p>No dated activity records match the selected filters.</p>
+    <p>— / 100</p>
+    <small>{{ target_progress.reason }}</small>
   {% endif %}
 </article>
+  </section>
+
+<section class="dashboard__charts" aria-label="Emissions charts">
+
+    <article class="chart-card">
+      <h2>Monthly emissions trend</h2>
+
+      {% if error %}
+        <p>Correct the filters above to view the chart.</p>
+      {% elif monthly_chart %}
+        {{ monthly_chart | safe }}
+        <p>
+          Emissions are grouped by activity start month.
+          Months without dated records are omitted.
+        </p>
+      {% else %}
+        <p>No dated activity records match the selected filters.</p>
+      {% endif %}
+    </article>
 
 <article class="stat-card">
   <h2>Monthly change</h2>
@@ -205,11 +211,85 @@
     
   </section>
 
-  <section class="dashboard__target">
-    <h2>Reduction target</h2>
-    <p>No target set.</p>
-    <button type="button" disabled>Set target — coming soon</button>
-  </section>
+<section class="dashboard__target">
+      <h2>Reduction target</h2>
+
+      {% if target %}
+        <p>
+          Reduce company emissions by
+          {{ "{:g}".format(target.reduction_percent) }}%.
+        </p>
+
+        <p>
+          Baseline: {{ target.baseline_start }} to {{ target.baseline_end }}.
+          Target period: {{ target.period_start }} to {{ target.period_end }}.
+        </p>
+
+        {% if target_progress.available %}
+          <dl>
+            <dt>Baseline emissions</dt>
+            <dd>
+              {{ "{:,.2f}".format(target_progress.baseline_kg) }} kg CO₂e
+            </dd>
+
+            <dt>Target emissions</dt>
+            <dd>
+              {{ "{:,.2f}".format(target_progress.target_kg) }} kg CO₂e
+            </dd>
+
+            <dt>Actual emissions</dt>
+            <dd>
+              {{ "{:,.2f}".format(target_progress.current_kg) }} kg CO₂e
+            </dd>
+
+            <dt>Actual reduction</dt>
+            <dd>
+              {{ "{:,.2f}".format(target_progress.actual_reduction_percent) }}%
+            </dd>
+          </dl>
+
+          <label for="target-progress">Target achieved</label>
+          <progress
+            id="target-progress"
+            value="{{ target_progress.score }}"
+            max="100"
+          >
+            {{ "{:.1f}".format(target_progress.score) }}%
+          </progress>
+          <p>{{ "{:.1f}".format(target_progress.score) }}% of target achieved.</p>
+
+          {% if target_progress.target_met %}
+            <p>Reduction target achieved.</p>
+          {% else %}
+            <p>
+              Further reduction needed:
+              {{ "{:,.2f}".format(target_progress.remaining_reduction_kg) }}
+              kg CO₂e.
+            </p>
+          {% endif %}
+        {% else %}
+          <p>{{ target_progress.reason }}</p>
+        {% endif %}
+
+        <p>
+          Target results use the saved reporting periods and all company
+          categories. Dashboard filters do not change this comparison.
+        </p>
+      {% else %}
+        <p>No target set.</p>
+      {% endif %}
+
+      {% if company is not none and config.DEBUG %}
+        <a href="{{ url_for('analytics.target_form') }}">
+          {% if target %}Set a new target{% else %}Set target{% endif %}
+        </a>
+      {% endif %}
+
+      <p>
+        Carbon Score measures progress towards your reduction target.
+        It is not a certified environmental rating.
+      </p>
+</section>
 
   {% if company is not none and not error %}
   <a href="{{ url_for(

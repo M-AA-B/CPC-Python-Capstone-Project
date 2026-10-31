@@ -1,10 +1,22 @@
 import os
+import secrets
 from datetime import date
 
-from flask import Response, current_app, render_template, request
+from flask import (
+    Response,
+    abort,
+    current_app,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 
 from app.extensions import db
 from app.models.company import Company
+from app.models.target import Target
+
 from . import bp
 from .charts import build_monthly_chart, build_category_chart
 from .exports import build_analytics_csv
@@ -13,6 +25,11 @@ from .services import (
     get_emissions_by_category,
     get_monthly_emissions,
     compare_latest_months,
+)
+from .targets import (
+    get_latest_target,
+    get_target_progress,
+    validate_target_form,
 )
 
 
@@ -38,6 +55,13 @@ def index():
         company_id = os.getenv("ANALYTICS_DEV_COMPANY_ID")
         if company_id:
             company = db.session.get(Company, company_id)
+
+    target = (
+        get_latest_target(company.id)
+        if company is not None
+        else None
+    )
+    target_progress = get_target_progress(target)
 
     if company is not None:
         categories = [
@@ -121,4 +145,55 @@ def index():
         monthly_chart=monthly_chart,
         category_chart=category_chart,
         comparison=comparison,
+        target=target,
+        target_progress=target_progress,
+    )
+
+
+@bp.route("/target", methods=["GET", "POST"])
+def target_form():
+    # Target editing is restricted to development until S3 adds roles.
+    if not current_app.debug:
+        abort(403)
+
+    company_id = os.getenv("ANALYTICS_DEV_COMPANY_ID")
+    company = (
+        db.session.get(Company, company_id)
+        if company_id
+        else None
+    )
+
+    if company is None:
+        abort(403)
+
+    if "target_form_token" not in session:
+        session["target_form_token"] = secrets.token_urlsafe(32)
+
+    error = None
+
+    if request.method == "POST":
+        submitted_token = request.form.get("csrf_token", "")
+
+        if not secrets.compare_digest(
+            submitted_token,
+            session["target_form_token"],
+        ):
+            abort(400)
+
+        try:
+            values = validate_target_form(request.form)
+        except ValueError as exc:
+            error = str(exc)
+        else:
+            target = Target(company_id=company.id, **values)
+            db.session.add(target)
+            db.session.commit()
+            return redirect(url_for("analytics.index"))
+
+    return render_template(
+        "analytics/target_form.html",
+        company=company,
+        error=error,
+        values=request.form,
+        csrf_token=session["target_form_token"],
     )
