@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Group 13 · Carbon Footprint Tracker</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  {% block styles %}{% endblock %}
 </head>
 <body>
   <header><strong>Group 13 · Carbon Footprint Tracker</strong>
@@ -16,7 +17,6 @@
       <a href="{{ url_for('assistant.index') }}">AI assistant</a>
     </nav>
   </header>
-  {% block styles %}{% endblock %}
   <main>{% block content %}{% endblock %}</main>
 </body>
 </html>
