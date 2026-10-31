@@ -211,6 +211,17 @@
     <button type="button" disabled>Set target — coming soon</button>
   </section>
 
-  <button type="button" disabled>Export CSV — coming soon</button>
+  {% if company is not none and not error %}
+  <a href="{{ url_for(
+      'analytics.index',
+      start_date=filters.start_date,
+      end_date=filters.end_date,
+      category=filters.category,
+      export='csv'
+  ) }}">
+    Export CSV
+  </a>
+{% endif %}
+
 </section>
 {% endblock %}

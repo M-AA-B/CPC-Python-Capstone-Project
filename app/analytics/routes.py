@@ -1,12 +1,13 @@
 import os
 from datetime import date
 
-from flask import current_app, render_template, request
+from flask import Response, current_app, render_template, request
 
 from app.extensions import db
 from app.models.company import Company
 from . import bp
 from .charts import build_monthly_chart, build_category_chart
+from .exports import build_analytics_csv
 from .services import (
     get_emissions_summary,
     get_emissions_by_category,
@@ -32,11 +33,9 @@ def index():
         "category": request.args.get("category", "").strip(),
     }
 
-    # Temporary local development access.
-    # S3 will replace this with authenticated company access.
+    # S3 will replace development access with authenticated company access.
     if current_app.debug:
         company_id = os.getenv("ANALYTICS_DEV_COMPANY_ID")
-
         if company_id:
             company = db.session.get(Company, company_id)
 
@@ -88,6 +87,24 @@ def index():
                     end_date,
                     filters["category"],
                 )
+
+                if request.args.get("export") == "csv":
+                    csv_content = build_analytics_csv(
+                        summary,
+                        category_totals,
+                        monthly_totals,
+                    )
+
+                    return Response(
+                        "\ufeff" + csv_content,
+                        content_type="text/csv; charset=utf-8",
+                        headers={
+                            "Content-Disposition": (
+                                'attachment; filename="emissions-analytics.csv"'
+                            ),
+                            "Cache-Control": "no-store",
+                        },
+                    )
 
                 comparison = compare_latest_months(monthly_totals)
                 monthly_chart = build_monthly_chart(monthly_totals)
