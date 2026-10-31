@@ -1,3 +1,3 @@
-from flask import Blueprint
-bp = Blueprint("data", __name__, url_prefix="/activities")
-from . import routes
+from app.data_collection.routes import s1_bp as bp
+
+__all__ = ["bp"]

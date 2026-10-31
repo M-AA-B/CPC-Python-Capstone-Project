@@ -1,0 +1,3 @@
+company_id,department_id,factor_id,period_start,period_end,category,quantity,unit,factor_unit,factor_kg_co2e
+123e4567-e89b-12d3-a456-426614174000,123e4567-e89b-12d3-a456-426614174001,1,2026-10-01,2026-10-31,electricity,1500,kWh,kWh,0.42
+123e4567-e89b-12d3-a456-426614174000,123e4567-e89b-12d3-a456-426614174001,1,2026-11-01,2026-11-30,electricity,2000,kWh,kWh,0.42
