@@ -11,6 +11,7 @@ from .services import (
     get_emissions_summary,
     get_emissions_by_category,
     get_monthly_emissions,
+    compare_latest_months,
 )
 
 
@@ -22,6 +23,7 @@ def index():
     categories = []
     monthly_chart = None
     category_chart = None
+    comparison = None
     error = None
 
     filters = {
@@ -87,6 +89,7 @@ def index():
                     filters["category"],
                 )
 
+                comparison = compare_latest_months(monthly_totals)
                 monthly_chart = build_monthly_chart(monthly_totals)
                 category_chart = build_category_chart(category_totals)
 
@@ -100,4 +103,5 @@ def index():
         error=error,
         monthly_chart=monthly_chart,
         category_chart=category_chart,
+        comparison=comparison,
     )

@@ -120,6 +120,43 @@
   {% endif %}
 </article>
 
+<article class="stat-card">
+  <h2>Monthly change</h2>
+
+  {% if error %}
+    <p>—</p>
+    <small>Correct the filters above to view comparisons.</small>
+
+  {% elif comparison and comparison.available %}
+    <p>
+      {{ "{:+,.2f}".format(comparison.difference) }} kg CO₂e
+    </p>
+
+    {% if comparison.percentage is not none %}
+      <p>
+        {{ "{:+.1f}".format(comparison.percentage) }}%
+        compared with the previous month
+      </p>
+    {% else %}
+      <p>Percentage change is unavailable because the previous total was zero.</p>
+    {% endif %}
+
+    <small>
+      {{ comparison.latest_month }} compared with
+      {{ comparison.previous_month }}.
+      Uses records matching the selected filters.
+    </small>
+
+  {% elif comparison %}
+    <p>—</p>
+    <small>{{ comparison.reason }}</small>
+
+  {% else %}
+    <p>—</p>
+    <small>No company data available for comparison.</small>
+  {% endif %}
+</article>
+
 <article class="chart-card">
   <h2>Emissions by category</h2>
 

@@ -72,7 +72,6 @@ def get_emissions_by_category(
         func.nullif(func.trim(ActivityRecord.category), ""),
         "Uncategorised",
     )
-
     total = func.sum(ActivityRecord.co2e_kg)
 
     statement = (
@@ -143,4 +142,52 @@ def get_monthly_emissions(
             "total_emissions": float(row.total_emissions),
         }
         for row in results
-    ]   
+    ]
+
+
+def compare_latest_months(monthly_totals):
+    """Compare the latest two months only when they are consecutive."""
+    if len(monthly_totals) < 2:
+        return {
+            "available": False,
+            "reason": "At least two consecutive months with records are needed.",
+        }
+
+    previous = monthly_totals[-2]
+    latest = monthly_totals[-1]
+
+    previous_year, previous_month = map(
+        int, previous["month"].split("-")
+    )
+    latest_year, latest_month = map(
+        int, latest["month"].split("-")
+    )
+
+    previous_index = previous_year * 12 + previous_month
+    latest_index = latest_year * 12 + latest_month
+
+    if latest_index - previous_index != 1:
+        return {
+            "available": False,
+            "reason": "The latest recorded months are not consecutive.",
+        }
+
+    previous_total = previous["total_emissions"]
+    latest_total = latest["total_emissions"]
+    difference = latest_total - previous_total
+
+    percentage = (
+        difference / previous_total * 100
+        if previous_total != 0
+        else None
+    )
+
+    return {
+        "available": True,
+        "previous_month": previous["month"],
+        "latest_month": latest["month"],
+        "previous_total": previous_total,
+        "latest_total": latest_total,
+        "difference": difference,
+        "percentage": percentage,
+    }
