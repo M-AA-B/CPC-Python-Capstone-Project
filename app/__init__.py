@@ -47,5 +47,3 @@ def create_app(test_config=None):
         return {"status": "ok"}
 
     return app
-
-    return app

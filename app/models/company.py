@@ -18,8 +18,8 @@ class Company(db.Model):
         return list(self.departments)
 
     def get_total_employees(self) -> int:
-        """Calculates or returns total employees across all departments (placeholder for S3)."""
-        return 0
+        """Returns total registered users across this company."""
+        return len(self.users) if hasattr(self, "users") and self.users is not None else 0
 
     def to_dict(self) -> dict:
         return {

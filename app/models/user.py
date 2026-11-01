@@ -44,6 +44,22 @@ class User(UserMixin, db.Model):
     company = db.relationship('Company', backref='users')
     department = db.relationship('Department')
 
+    def __init__(self, **kwargs):
+        """Constructor: Proper state initialization (Hometask 1)."""
+        kwargs.setdefault("role", Role.EMPLOYEE)
+        super().__init__(**kwargs)
+
+    # --- Encapsulation: Getters & Setters (Hometask 1) ---
+    def get_role(self) -> str:
+        """Accessor (getter) for user role."""
+        return self.role
+
+    def set_role(self, role: str) -> None:
+        """Mutator (setter) for user role with validation."""
+        if role not in Role.ALL:
+            raise ValueError(f"Unknown role: {role!r}")
+        self.role = role
+
     def set_password(self, password: str) -> None:
         """Store only a salted hash (werkzeug scrypt), never the password itself."""
         self.password_hash = generate_password_hash(password)

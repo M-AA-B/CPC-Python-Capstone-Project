@@ -6,6 +6,7 @@ from flask import (
     Response,
     abort,
     current_app,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -18,19 +19,27 @@ from app.models.company import Company
 from app.models.target import Target
 
 from . import bp
-from .charts import build_monthly_chart, build_category_chart
-from .exports import build_analytics_csv
+from .exceptions import (
+    AnalyticsError,
+    InvalidFilterError,
+    TargetValidationError,
+)
+from .report import DashboardReport
 from .services import (
-    get_emissions_summary,
+    AnalyticsService,
     get_emissions_by_category,
-    get_monthly_emissions,
-    compare_latest_months,
 )
 from .targets import (
     get_latest_target,
     get_target_progress,
     validate_target_form,
 )
+
+
+@bp.errorhandler(AnalyticsError)
+def handle_analytics_error(error: AnalyticsError):
+    """Centralized error handler for Subsystem 2 custom exceptions (Hometask 4)."""
+    return jsonify(error.to_dict()), error.status_code
 
 
 @bp.get("/")
@@ -70,69 +79,66 @@ def index():
         ]
 
         try:
-            start_date = (
-                date.fromisoformat(filters["start_date"])
-                if filters["start_date"]
-                else None
+            try:
+                start_date = (
+                    date.fromisoformat(filters["start_date"])
+                    if filters["start_date"]
+                    else None
+                )
+                end_date = (
+                    date.fromisoformat(filters["end_date"])
+                    if filters["end_date"]
+                    else None
+                )
+            except ValueError:
+                raise InvalidFilterError(
+                    "Enter valid dates in YYYY-MM-DD format."
+                ) from None
+
+            service = AnalyticsService(company_id=company.id)
+            service.configure_filters(
+                start_date=start_date,
+                end_date=end_date,
+                category=filters["category"],
             )
-            end_date = (
-                date.fromisoformat(filters["end_date"])
-                if filters["end_date"]
-                else None
-            )
-        except ValueError:
-            error = "Enter valid dates in YYYY-MM-DD format."
-        else:
-            if start_date and end_date and start_date > end_date:
-                error = "Start date must be on or before end date."
-            elif (
+
+            if (
                 filters["category"]
                 and filters["category"] not in categories
             ):
-                error = "Select an available category."
-            else:
-                summary = get_emissions_summary(
-                    company.id,
-                    start_date,
-                    end_date,
-                    filters["category"],
+                raise InvalidFilterError("Select an available category.")
+
+        except InvalidFilterError as exc:
+            error = str(exc)
+        else:
+            summary = service.get_summary()
+            category_totals = service.group_by_category()
+            monthly_totals = service.get_monthly_totals()
+
+            report = DashboardReport(
+                summary=summary,
+                category_totals=category_totals,
+                monthly_totals=monthly_totals,
+            )
+
+            if request.args.get("export") == "csv":
+                csv_content = report.export_CSV()
+
+                return Response(
+                    "\ufeff" + csv_content,
+                    content_type="text/csv; charset=utf-8",
+                    headers={
+                        "Content-Disposition": (
+                            f'attachment; filename="{report.filename}"'
+                        ),
+                        "Cache-Control": "no-store",
+                    },
                 )
 
-                category_totals = get_emissions_by_category(
-                    company.id,
-                    start_date,
-                    end_date,
-                    filters["category"],
-                )
-
-                monthly_totals = get_monthly_emissions(
-                    company.id,
-                    start_date,
-                    end_date,
-                    filters["category"],
-                )
-
-                if request.args.get("export") == "csv":
-                    csv_content = build_analytics_csv(
-                        summary,
-                        category_totals,
-                        monthly_totals,
-                    )
-
-                    return Response(
-                        "\ufeff" + csv_content,
-                        content_type="text/csv; charset=utf-8",
-                        headers={
-                            "Content-Disposition": (
-                                'attachment; filename="emissions-analytics.csv"'
-                            ),
-                            "Cache-Control": "no-store",
-                        },
-                    )
-
-                comparison = compare_latest_months(monthly_totals)
-                monthly_chart = build_monthly_chart(monthly_totals)
-                category_chart = build_category_chart(category_totals)
+            comparison = report.display_summary()["comparison"]
+            charts = report.generate_charts()
+            monthly_chart = charts["monthly_chart"]
+            category_chart = charts["category_chart"]
 
     return render_template(
         "analytics/index.html",
@@ -182,7 +188,7 @@ def target_form():
 
         try:
             values = validate_target_form(request.form)
-        except ValueError as exc:
+        except TargetValidationError as exc:
             error = str(exc)
         else:
             target = Target(company_id=company.id, **values)

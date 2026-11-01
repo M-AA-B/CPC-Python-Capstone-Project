@@ -62,13 +62,36 @@ def _utcnow() -> datetime:
 # --- OpenAI client ---------------------------------------------------------
 
 class AIClient:
+    """Encapsulates OpenAI API communication, rate limits, and token budgets (S3 & Hometask 1)."""
+
     def __init__(self, api_key: str, model: str, timeout: float = 10.0,
                  max_tokens: int = 600, daily_limit: int = 200):
-        self.model = model
-        self.max_tokens = max_tokens
-        self.daily_limit = daily_limit
+        """Constructor: Proper state initialization (Hometask 1)."""
+        self._model = "gpt-4o-mini"
+        self._timeout = 10.0
+        self._max_tokens = 600
+        self._daily_limit = 200
+        self.configure(model=model, timeout=timeout, max_tokens=max_tokens, daily_limit=daily_limit)
         # The key stays on the server; without one the assistant shows a message instead
-        self._client = openai.OpenAI(api_key=api_key, timeout=timeout, max_retries=1) if api_key else None
+        self._client = openai.OpenAI(api_key=api_key, timeout=self._timeout, max_retries=1) if api_key else None
+
+    # --- Initialization / Setup Methods (Hometask 1) ---
+    def configure(
+        self,
+        model: str | None = None,
+        timeout: float | None = None,
+        max_tokens: int | None = None,
+        daily_limit: int | None = None,
+    ) -> None:
+        """Applies and validates OpenAI model, timeout, token, and daily limit settings."""
+        if model is not None:
+            self.model = model
+        if timeout is not None:
+            self.timeout = timeout
+        if max_tokens is not None:
+            self.max_tokens = max_tokens
+        if daily_limit is not None:
+            self.daily_limit = daily_limit
 
     @classmethod
     def from_config(cls) -> "AIClient":
@@ -79,6 +102,51 @@ class AIClient:
             int(_setting("AI_MAX_TOKENS")),
             int(_setting("AI_DAILY_REQUEST_LIMIT")),
         )
+
+    # --- Encapsulation: Getters & Setters (Hometask 1) ---
+    @property
+    def model(self) -> str:
+        return self._model
+
+    @model.setter
+    def model(self, value: str) -> None:
+        cleaned = (value or "").strip()
+        if not cleaned:
+            raise ValueError("Model name cannot be empty.")
+        self._model = cleaned
+
+    @property
+    def timeout(self) -> float:
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, value: float) -> None:
+        seconds = float(value)
+        if seconds <= 0:
+            raise ValueError("Timeout must be greater than 0 seconds.")
+        self._timeout = seconds
+
+    @property
+    def max_tokens(self) -> int:
+        return self._max_tokens
+
+    @max_tokens.setter
+    def max_tokens(self, value: int) -> None:
+        tokens = int(value)
+        if tokens <= 0:
+            raise ValueError("max_tokens must be a positive integer.")
+        self._max_tokens = tokens
+
+    @property
+    def daily_limit(self) -> int:
+        return self._daily_limit
+
+    @daily_limit.setter
+    def daily_limit(self, value: int) -> None:
+        limit = int(value)
+        if limit < 0:
+            raise ValueError("daily_limit cannot be negative.")
+        self._daily_limit = limit
 
     def requests_today(self, company_id: str) -> int:
         midnight = datetime.combine(_utcnow().date(), time.min, tzinfo=timezone.utc)
@@ -191,13 +259,69 @@ def parse_recommendations(raw: str, max_saving_kg: float) -> list[dict]:
 # --- AI Sustainability Coach -----------------------------------------------
 
 class AIAssistant:
-    def __init__(self, client: AIClient, prompts: PromptBuilder | None = None):
+    """AI Sustainability Coach service orchestrating chat, department tips, and monthly reports (UML S3 & Hometask 1)."""
+
+    def __init__(self, client: AIClient, prompts: PromptBuilder | None = None,
+                 history_limit: int = HISTORY_LENGTH):
+        """Constructor: Proper state initialization (Hometask 1)."""
+        self._client: AIClient = client
+        self._prompts: PromptBuilder = prompts or PromptBuilder()
+        self._history_limit: int = HISTORY_LENGTH
         self.client = client
         self.prompts = prompts or PromptBuilder()
+        self.history_limit = history_limit
+
+    # --- Initialization / Setup Methods (Hometask 1) ---
+    def reset_defaults(self) -> None:
+        """Resets prompt builder and chat history depth to standard defaults."""
+        self._prompts = PromptBuilder()
+        self._history_limit = HISTORY_LENGTH
 
     @classmethod
     def from_app(cls) -> "AIAssistant":
         return cls(AIClient.from_config())
+
+    # --- Encapsulation: Getters & Setters (UML S3 & Hometask 1) ---
+    @property
+    def client(self) -> AIClient:
+        return self._client
+
+    @client.setter
+    def client(self, value: AIClient) -> None:
+        if not isinstance(value, AIClient):
+            raise TypeError("client must be an AIClient instance.")
+        self._client = value
+
+    @property
+    def prompts(self) -> PromptBuilder:
+        return self._prompts
+
+    @prompts.setter
+    def prompts(self, value: PromptBuilder) -> None:
+        if not isinstance(value, PromptBuilder):
+            raise TypeError("prompts must be a PromptBuilder instance.")
+        self._prompts = value
+
+    @property
+    def model(self) -> str:
+        """Accessor for active OpenAI model name (UML S3)."""
+        return self._client.model
+
+    @model.setter
+    def model(self, value: str) -> None:
+        """Mutator for active OpenAI model name (UML S3)."""
+        self._client.model = value
+
+    @property
+    def history_limit(self) -> int:
+        return self._history_limit
+
+    @history_limit.setter
+    def history_limit(self, value: int) -> None:
+        limit = int(value)
+        if limit < 0:
+            raise ValueError("history_limit cannot be negative.")
+        self._history_limit = limit
 
     @staticmethod
     def history(user_id: str, limit: int) -> list[ChatMessage]:
@@ -217,7 +341,7 @@ class AIAssistant:
             raise ValueError(f"Please keep questions under {MAX_QUESTION_LENGTH} characters.")
 
         summary = self.prompts.build_context(user.company_id)
-        messages = self.prompts.chat_messages(summary, question, self.history(user.id, HISTORY_LENGTH))
+        messages = self.prompts.chat_messages(summary, question, self.history(user.id, self._history_limit))
 
         asked_at = _utcnow()
         # Raises AIUnavailable; then nothing is saved

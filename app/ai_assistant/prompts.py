@@ -49,6 +49,43 @@ def default_period(today: date | None = None) -> tuple[date, date]:
 
 
 class PromptBuilder:
+    """Builds structured OpenAI prompt payloads from aggregated company emissions (UML S3 & Hometask 1)."""
+
+    def __init__(self, system_prompt: str = SYSTEM_PROMPT, max_hotspots: int = 3):
+        """Constructor: Proper state initialization (Hometask 1)."""
+        self._system_prompt = SYSTEM_PROMPT
+        self._max_hotspots = 3
+        self.system_prompt = system_prompt
+        self.max_hotspots = max_hotspots
+
+    # --- Initialization / Setup Methods (Hometask 1) ---
+    def reset_templates(self) -> None:
+        """Resets prompt configuration back to default instructions and hotspot count."""
+        self._system_prompt = SYSTEM_PROMPT
+        self._max_hotspots = 3
+
+    # --- Encapsulation: Getters & Setters (Hometask 1) ---
+    @property
+    def system_prompt(self) -> str:
+        return self._system_prompt
+
+    @system_prompt.setter
+    def system_prompt(self, value: str) -> None:
+        cleaned = (value or "").strip()
+        if not cleaned:
+            raise ValueError("System prompt cannot be empty.")
+        self._system_prompt = cleaned
+
+    @property
+    def max_hotspots(self) -> int:
+        return self._max_hotspots
+
+    @max_hotspots.setter
+    def max_hotspots(self, value: int) -> None:
+        count = int(value)
+        if count < 1:
+            raise ValueError("max_hotspots must be at least 1.")
+        self._max_hotspots = count
 
     @staticmethod
     def build_context(company_id: str, start: date | None = None, end: date | None = None) -> dict:
@@ -68,7 +105,7 @@ class PromptBuilder:
         return "Company data (aggregated, kg CO2e):\n" + json.dumps(summary, default=str)
 
     def system_message(self, summary: dict) -> dict:
-        return {"role": "system", "content": f"{SYSTEM_PROMPT}\n\n{self.data_block(summary)}"}
+        return {"role": "system", "content": f"{self._system_prompt}\n\n{self.data_block(summary)}"}
 
     def chat_messages(self, summary: dict, question: str,
                       history: Iterable[ChatMessage] = ()) -> list[dict]:
@@ -80,7 +117,10 @@ class PromptBuilder:
         return messages
 
     def advice_prompt(self, summary: dict, department: str, annual_kg: float) -> list[dict]:
-        hotspots = ", ".join(f"{name} ({share:.0f} %)" for name, _kg, share in self.hotspots(summary))
+        hotspots = ", ".join(
+            f"{name} ({share:.0f} %)"
+            for name, _kg, share in self.hotspots(summary, top=self._max_hotspots)
+        )
         instruction = ADVICE_PROMPT.format(
             department=department,
             department_kg=summary["by_department"].get(department, 0.0),
