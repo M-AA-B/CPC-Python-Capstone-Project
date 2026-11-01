@@ -103,7 +103,7 @@ The score is a project progress indicator, not a certified environmental rating.
 python -m pytest -q
 ```
 
-The latest local run passed 67 tests, including analytics aggregation,
+The latest local run passed 75 tests, including analytics aggregation,
 company isolation in service queries, filters, comparisons and scoring.
 
 Tests currently use SQLite. PostgreSQL verification and route-level tests
