@@ -3,5 +3,7 @@ from app.models.department import Department
 from app.models.emission_factor import EmissionFactor
 from app.models.activity_record import ActivityRecord
 from app.models.user import User
+from .target import Target
 
 __all__ = ['Company', 'Department', 'EmissionFactor', 'ActivityRecord', 'User']
+

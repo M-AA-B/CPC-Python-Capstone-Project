@@ -1,1 +1,276 @@
-/* TODO: Add subsystem styles or behaviour here. */
+.dashboard {
+  --green: #176749;
+  --border: #dce5df;
+  --muted: #60736a;
+  color: #183d30;
+  padding: 0.5rem;
+}
+
+.dashboard,
+.dashboard * {
+  box-sizing: border-box;
+}
+
+.dashboard__header {
+  max-width: none;
+  margin: 0 0 1.75rem;
+  padding: 0;
+}
+
+.dashboard h1 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  line-height: 1.2;
+}
+
+.dashboard h2 {
+  margin: 0 0 1rem;
+  font-size: 1.15rem;
+}
+
+.dashboard p {
+  line-height: 1.6;
+}
+
+.dashboard small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.dashboard__header p {
+  margin: 0.5rem 0;
+  color: var(--muted);
+}
+
+.dashboard form {
+  margin-bottom: 1.25rem;
+}
+
+.dashboard fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  margin: 0 0 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #f7faf8;
+}
+
+.dashboard legend {
+  padding: 0 0.4rem;
+  font-weight: 650;
+}
+
+.dashboard label {
+  font-size: 0.9rem;
+  font-weight: 550;
+}
+
+.dashboard input,
+.dashboard select {
+  max-width: 100%;
+  min-height: 42px;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #b8c9bf;
+  border-radius: 6px;
+  background: white;
+  color: #183d30;
+  font: inherit;
+}
+
+.dashboard input[type="checkbox"] {
+  min-height: auto;
+  margin-right: 0.4rem;
+  accent-color: var(--green);
+}
+
+.dashboard button,
+.dashboard a[href*="/target"],
+.dashboard a[href*="export=csv"] {
+  display: inline-block;
+  min-height: 42px;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--green);
+  border-radius: 7px;
+  background: var(--green);
+  color: white;
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.dashboard button:hover,
+.dashboard a[href*="/target"]:hover,
+.dashboard a[href*="export=csv"]:hover {
+  background: #105139;
+}
+
+.dashboard :is(a, button, input, select):focus-visible {
+  outline: 3px solid #d29922;
+  outline-offset: 3px;
+}
+
+.dashboard [role="alert"] {
+  padding: 1rem;
+  border-left: 4px solid #b42318;
+  border-radius: 5px;
+  background: #fff1ef;
+  color: #8a2018;
+}
+
+.dashboard__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.stat-card,
+.chart-card,
+.dashboard__target {
+  min-width: 0;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 3px 12px rgb(24 61 48 / 4%);
+}
+
+.dashboard__stats .stat-card > p:first-of-type {
+  margin: 0.5rem 0;
+  color: var(--green);
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.dashboard__charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.dashboard__charts > .stat-card {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.chart-card {
+  overflow-x: auto;
+}
+
+.dashboard table {
+  width: 100%;
+  margin-top: 1rem;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.dashboard th,
+.dashboard td {
+  padding: 0.8rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.dashboard th {
+  background: #f2f7f4;
+  font-weight: 650;
+}
+
+.dashboard th:last-child,
+.dashboard td:last-child {
+  text-align: right;
+}
+
+.dashboard__target {
+  margin-bottom: 1.25rem;
+}
+
+.dashboard dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.75rem 1rem;
+  max-width: 600px;
+}
+
+.dashboard dt {
+  color: var(--muted);
+}
+
+.dashboard dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.dashboard progress {
+  display: block;
+  width: 100%;
+  height: 20px;
+  margin: 0.75rem 0;
+  accent-color: var(--green);
+}
+
+.dashboard form fieldset p {
+  flex: 1 1 220px;
+  margin: 0;
+}
+
+.dashboard form fieldset p label,
+.dashboard form fieldset p input {
+  display: block;
+  width: 100%;
+}
+
+.dashboard form fieldset p label {
+  margin-bottom: 0.4rem;
+}
+
+@media (max-width: 800px) {
+  .dashboard__charts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard__charts > .stat-card {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .dashboard {
+    padding: 0;
+  }
+
+  .dashboard__stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stat-card,
+  .chart-card,
+  .dashboard__target {
+    padding: 1rem;
+  }
+
+  .dashboard fieldset {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dashboard fieldset > input,
+  .dashboard fieldset > select {
+    width: 100%;
+  }
+
+  .dashboard form fieldset p {
+    flex: auto;
+    width: 100%;
+  }
+}
