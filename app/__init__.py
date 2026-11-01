@@ -1,6 +1,6 @@
 import os
 from flask import Flask, render_template
-from app.extensions import db
+from app.extensions import db, login_manager
 
 
 def create_app(test_config=None):
@@ -24,6 +24,11 @@ def create_app(test_config=None):
 
     # 3. Initialize Flask extensions with the finalized configuration
     db.init_app(app)
+    login_manager.init_app(app)
+
+    # S3: user loader for Flask-Login, csrf_token() in templates, 403 page
+    from app.user_access.services import register_user_access
+    register_user_access(app)
 
     # Register Blueprints
     from app.data_collection import bp as data_bp

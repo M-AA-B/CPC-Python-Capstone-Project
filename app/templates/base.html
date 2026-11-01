@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Group 13 · Carbon Footprint Tracker</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  {% block styles %}{% endblock %}
 </head>
 <body>
   <header><strong>Group 13 · Carbon Footprint Tracker</strong>
@@ -12,8 +13,13 @@
       <a href="{{ url_for('home') }}">Home</a>
       <a href="{{ url_for('data.index') }}">Activities</a>
       <a href="{{ url_for('analytics.index') }}">Analytics</a>
-      <a href="{{ url_for('access.index') }}">User access</a>
       <a href="{{ url_for('assistant.index') }}">AI assistant</a>
+      {% if current_user.is_authenticated %}
+        {% if current_user.is_admin %}<a href="{{ url_for('access.users') }}">Users</a>{% endif %}
+        <a href="{{ url_for('access.index') }}">{{ current_user.email }} ({{ current_user.role }})</a>
+      {% else %}
+        <a href="{{ url_for('access.login') }}">Log in</a>
+      {% endif %}
     </nav>
   </header>
   <main>{% block content %}{% endblock %}</main>
