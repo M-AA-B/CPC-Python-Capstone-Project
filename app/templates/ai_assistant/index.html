@@ -1,5 +1,12 @@
 {% extends "base.html" %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/assistant.css') }}">{% endblock %}
 {% block content %}
-<h1>S3 — AI Assistant</h1>
-<p>Owner: Junaid. Feature implementation pending.</p>
+<h1>AI Sustainability Coach</h1>
+<p>Ask questions about your company's emissions, get reduction tips for each department and a
+  plain-language monthly summary.</p>
+<ul>
+  <li>The AI only sees totals (per department, category, scope and month), never single records or personal data.</li>
+  <li>Tips are checked before they are saved: the estimated saving can never be more than the department emits.</li>
+</ul>
+<p><a href="{{ url_for('access.login', next=url_for('assistant.index')) }}">Log in</a> to use the assistant.</p>
 {% endblock %}

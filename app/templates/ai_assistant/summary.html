@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/assistant.css') }}">{% endblock %}
+{% block content %}
+<h1>Monthly summary</h1>
+{% include "ai_assistant/_nav.html" %}
+<p class="ai-muted">A plain-language AI report on one month's emissions, compared with the month before.</p>
+
+<form method="post" class="ai-row"
+      onsubmit="this.querySelector('button').disabled = true; document.getElementById('summary-loading').hidden = false;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="month" name="month" value="{{ month_value }}" required aria-label="Month">
+  <button type="submit">Generate summary</button>
+  <span id="summary-loading" class="ai-muted" hidden>Writing summary…</span>
+</form>
+
+{% if text %}
+<article class="summary-card">
+  <h2>{{ month.strftime("%B %Y") }}</h2>
+  <p>{{ text }}</p>
+</article>
+{% endif %}
+{% endblock %}
