@@ -50,8 +50,9 @@ def csrf_token() -> str:
 
 
 def check_csrf() -> None:
-    """Stop the request (400) unless the form sent the session's token."""
+    """Stop the request (400) unless the form (or the X-CSRFToken header for fetch/JSON
+    requests) sent the session's token."""
     expected = session.get(CSRF_SESSION_KEY)
-    submitted = request.form.get("csrf_token", "")
+    submitted = request.form.get("csrf_token") or request.headers.get("X-CSRFToken", "")
     if not expected or not secrets.compare_digest(submitted, expected):
         abort(400, "Invalid or missing form token. Please reload the page and try again.")

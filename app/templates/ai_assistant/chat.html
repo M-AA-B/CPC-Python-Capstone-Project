@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/assistant.css') }}">{% endblock %}
+{% block content %}
+<h1>AI Sustainability Coach</h1>
+{% include "ai_assistant/_nav.html" %}
+<p class="ai-muted">Ask about your company's emissions. Answers use only your company's aggregated figures.</p>
+
+<div id="chat-log" class="chat-log" aria-live="polite">
+  {% for message in history %}
+    <div class="chat-msg chat-{{ message.sender }}">{{ message.content }}</div>
+  {% else %}
+    <p id="chat-empty" class="ai-muted">No messages yet. Try one of the questions below.</p>
+  {% endfor %}
+</div>
+
+<p id="chat-loading" class="ai-muted" hidden>The coach is thinking…</p>
+
+<div class="chat-examples">
+  {% for example in ["Which department emits the most?", "How can we cut emissions?", "How did last month compare?"] %}
+    <button type="button" class="ai-chip chat-example">{{ example }}</button>
+  {% endfor %}
+</div>
+
+<form id="chat-form" class="chat-form" action="{{ url_for('assistant.ask') }}" data-csrf="{{ csrf_token() }}">
+  <input id="chat-input" maxlength="{{ max_length }}" placeholder="Ask a question…" autocomplete="off" aria-label="Your question">
+  <button id="chat-send" type="submit">Send</button>
+</form>
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+{% endblock %}

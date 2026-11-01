@@ -3,18 +3,10 @@ import pytest
 
 from app.extensions import db
 from app.models.company import Company
-from app.models.department import Department
 from app.models.user import Role, User
 from app.user_access.permissions import require_role
 from app.user_access.services import AuthError, AuthService
-
-PASSWORD = "demo1234"
-TOKEN = "test-csrf-token"
-
-
-@pytest.fixture()
-def app(client):
-    return client.application
+from s3_helpers import PASSWORD, app, demo, get_department, get_user, login, post  # noqa: F401
 
 
 @pytest.fixture()
@@ -27,35 +19,6 @@ def protected_page(app):
 
     app.add_url_rule("/test/manager-page", "manager_page", manager_page)
     return "/test/manager-page"
-
-
-@pytest.fixture()
-def demo(client):
-    """Demo GmbH with an admin, a manager and an employee (password demo1234)."""
-    admin = AuthService.register("Demo GmbH", "admin@demo.de", PASSWORD, ["Logistics", "Office"])
-    office = get_department("Office")
-    AuthService.create_user(admin, "manager@demo.de", PASSWORD, Role.MANAGER, office.id)
-    AuthService.create_user(admin, "employee@demo.de", PASSWORD, Role.EMPLOYEE, office.id)
-    return admin
-
-
-def get_user(email):
-    return db.session.scalar(db.select(User).filter_by(email=email))
-
-
-def get_department(name):
-    return db.session.scalar(db.select(Department).filter_by(name=name))
-
-
-def post(client, url, data, token=TOKEN):
-    """POST a form like the browser does: the session holds the CSRF token, the form sends it."""
-    with client.session_transaction() as session:
-        session["csrf_token"] = TOKEN
-    return client.post(url, data={**data, "csrf_token": token})
-
-
-def login(client, email, password=PASSWORD):
-    return post(client, "/auth/login", {"email": email, "password": password})
 
 
 # --- passwords -------------------------------------------------------------
