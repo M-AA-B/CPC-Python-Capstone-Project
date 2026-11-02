@@ -1,21 +1,9 @@
-"""Shared OOP Domain Models across Subsystems S1, S2, and S3."""
-from .activity_record import ActivityRecord
-from .chat_message import ChatMessage
-from .company import Company
-from .department import Department
-from .emission_factor import EmissionFactor
-from .recommendation import Recommendation
-from .target import ReductionTarget, Target
-from .user import User
+from app.models.company import Company
+from app.models.department import Department
+from app.models.emission_factor import EmissionFactor
+from app.models.activity_record import ActivityRecord
+from app.models.user import User
+from .target import Target
 
-__all__ = [
-    "Company",
-    "Department",
-    "EmissionFactor",
-    "ActivityRecord",
-    "Target",
-    "ReductionTarget",
-    "User",
-    "ChatMessage",
-    "Recommendation",
-]
+__all__ = ['Company', 'Department', 'EmissionFactor', 'ActivityRecord', 'User']
+

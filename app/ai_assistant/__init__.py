@@ -1,5 +1,4 @@
-"""Subsystem 3 — AI Sustainability Coach (Junaid Ahmad · 7222074)."""
-from .prompts import PromptBuilder
-from .services import AIAssistant
+from flask import Blueprint
 
-__all__ = ["PromptBuilder", "AIAssistant"]
+bp = Blueprint("assistant", __name__, url_prefix="/assistant")
+from . import routes

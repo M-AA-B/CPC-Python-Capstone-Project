@@ -1,99 +1,88 @@
-# Enterprise Carbon Footprint Tracker & AI Assistant — Hometask 1 & 2
+# Enterprise Carbon Footprint Tracker & AI Assistant
 
-**Group 13 — Compact Programming, FH Dortmund**
+**Group 13 — Compact Programming (Capstone Project), FH Dortmund**
 
-This branch (`HomeworkAssignment2`) builds on `Homeassignment1` by adding our event-driven **Real-Time Telemetry Stream Processing** framework (`app/data_collection/stream_processing.py`) on top of the OOP subsystem classes of our Group 13 Capstone Project UML class diagrams across all three subsystems. Every class implements explicit state initialization (`__init__`), configuration/setup methods, and encapsulated getters & setters with domain validation.
+Our platform helps small and mid-sized enterprises record operational activities across Scopes 1–3, stream real-time telemetry into metric tons of CO₂e, visualize emissions and Carbon Score progress on an interactive dashboard, and receive department-tailored reduction recommendations from an AI Sustainability Coach.
 
 ---
 
-## Team Overview
+## Team Overview & Student Identification
 
-| Team Member | Program | Matriculation ID | Assigned Subsystem | Implemented OOP Classes (≥ 3 per Member) |
+| Team Member | Program | Matriculation ID | Assigned Subsystem | Main Packages |
 |---|---|---|---|---|
-| **Mohammed Al-Amine Bennani** | MDT | `7222047` | **S1 — Data Collection & Calculation** (`app/data_collection/`, `app/models/`) | `Company`, `Department`, `EmissionFactor`, `ActivityRecord`, `EmissionCalculator`, `CsvImporter` |
-| **Vanessa Mukamanzi** | MDT | `7223964` | **S2 — Analytics & Dashboard** (`app/analytics/`, `app/models/target.py`) | `ReductionTarget`, `AnalyticsService`, `DashboardReport` |
-| **Junaid Ahmad** | MDT | `7222074` | **S3 — AI Assistant & User Access** (`app/user_access/`, `app/ai_assistant/`, `app/models/`) | `User`, `ChatMessage`, `Recommendation`, `AuthService`, `PromptBuilder`, `AIAssistant` |
+| **Mohammed Al-Amine Bennani** | MDT | `7222047` | **S1 — Data Collection, Calculation & Stream Processing** | `app/data_collection`, `app/models` |
+| **Vanessa Mukamanzi** | MDT | `7223964` | **S2 — Analytics & Dashboard** | `app/analytics`, `app/models/target.py` |
+| **Junaid Ahmad** | MDT | `7222074` | **S3 — AI Assistant & User Access** | `app/ai_assistant`, `app/user_access`, `app/models` |
 
 ---
 
-## Directory Structure
+## Current Features
 
-```text
-.
-├── README.md
-├── demo.py                      # Runnable OOP demonstration across S1, S2, and S3
-└── app/
-    ├── models/                  # Domain models (Company, Department, EmissionFactor, ActivityRecord, Target, User, ChatMessage, Recommendation)
-    ├── data_collection/         # S1 — Mohammed Al-Amine Bennani (7222047): EmissionCalculator, CsvImporter
-    ├── analytics/               # S2 — Vanessa Mukamanzi (7223964): AnalyticsService, DashboardReport, CarbonScorer
-    ├── user_access/             # S3 — Junaid Ahmad (7222074): AuthService
-    └── ai_assistant/            # S3 — Junaid Ahmad (7222074): PromptBuilder, AIAssistant
-```
+- **S1 — Data Collection & Stream Processing:**
+  - Manual activity entry forms, REST JSON CRUD endpoints (`/activities/api/records`), and bulk CSV import (`CsvImporter`).
+  - Automated CO₂e calculation and GHG Protocol Scope 1–3 assignment (`EmissionCalculator`).
+  - Event-driven real-time telemetry stream pipeline (`StreamProcessor`, `ScopeFilter`, `MetricTonCO2eTransformer`, `TelemetryStream`) converting flight bookings, server utility logs, and freight payloads into metric tons of CO₂e.
+- **S2 — Analytics & Dashboard:**
+  - Company-isolated emission totals, category breakdowns, and consecutive monthly comparisons (`AnalyticsService`).
+  - Interactive Plotly bar charts, date/category filtering, and UTF-8 CSV report exports (`DashboardReport`).
+  - Carbon reduction target management (`Target` / `ReductionTarget`) and bounded target-progress scoring (`CarbonScorer`).
+- **S3 — AI Assistant & User Access:**
+  - Company registration, salted password hashing, session authentication, CSRF protection, and role-based access control (`Admin`, `Manager`, `Employee`) via `AuthService` and `@require_role`.
+  - Privacy-preserving AI Sustainability Coach (`AIAssistant`, `AIClient`, `PromptBuilder`) sending only aggregated company totals to OpenAI, with validated JSON department recommendations (`Recommendation`) and plain-language monthly summaries.
 
 ---
 
-## System Design (UML Class Diagrams)
+## System Design & UML Class Diagrams
 
-### Subsystem 1 — Data Collection & Calculation (Mohammed Al-Amine Bennani · `7222047`)
+### Subsystem 1 — Data Collection & Calculation (S1)
 
 ```mermaid
 classDiagram
     class Company {
-        -str _id
-        -str _name
-        -str _industry
-        -list _departments
-        -int _employee_count
-        +configure_profile(name, industry, employee_count) None
-        +get_name() str
-        +set_name(name) None
+        +String id
+        +String name
+        +String industry
         +get_departments() list
         +get_total_employees() int
-        +set_total_employees(count) None
+        +to_dict() dict
     }
 
     class Department {
-        -str _id
-        -str _company_id
-        -str _name
-        -float _floor_area_m2
-        -list _activity_records
-        +configure_department(company_id, name, floor_area_m2) None
-        +get_name() str
-        +set_name(name) None
-        +get_floor_area_m2() float
-        +set_floor_area_m2(area) None
+        +String id
+        +String company_id
+        +String name
+        +Float floor_area_m2
         +get_activity_records() list
+        +to_dict() dict
     }
 
     class ActivityRecord {
-        -str _id
-        -str _department_id
-        -EmissionFactor _factor
-        -float _quantity
-        -str _unit
-        -float _calculated_co2e_kg
-        -date _record_date
-        +initialize_record(quantity, unit, record_date) None
+        +String id
+        +String company_id
+        +String department_id
+        +int factor_id
+        +Float quantity
+        +String unit
+        +Float co2e_kg
+        +int scope
+        +Date period_start
+        +Date period_end
         +get_quantity() float
         +set_quantity(value) None
         +get_unit() str
-        +set_unit(unit) None
-        +get_calculated_co2e_kg() float
+        +set_unit(value) None
+        +get_co2e_kg() float
         +is_valid() bool
         +update_quantity(new_val) None
     }
 
     class EmissionFactor {
-        -int _id
-        -str _category
-        -float _kg_co2e_per_unit
-        -str _unit
-        -int _scope
-        -int _valid_year
-        +configure_factor(category, kg_co2e_per_unit, unit, scope, valid_year) None
-        +get_kg_co2e_per_unit() float
-        +set_kg_co2e_per_unit(value) None
+        +int id
+        +String category
+        +Float kg_co2e_per_unit
+        +String unit
+        +int scope
+        +int valid_year
         +is_active(year) bool
     }
 
@@ -101,10 +90,9 @@ classDiagram
         <<Service>>
         -int _precision
         -dict _scope_mapping
-        -list _factors
         +reset_configuration() None
         +register_scope_category(category, scope) None
-        +calculate(rec) float
+        +calculate(quantity, factor_kg_co2e) float
         +assign_scope(category) int
         +fetch_factor(category, year) EmissionFactor
     }
@@ -113,10 +101,10 @@ classDiagram
         <<Service>>
         -str _encoding
         -list _error_log
+        -int _valid_count
         +initialize_session() None
-        +read_file(csv_source) list
-        +validate_row(row) bool
-        +save_valid_rows() list
+        +process(file_storage, user_id) dict
+        +validate_and_save_row(row, user_id) ActivityRecord
     }
 
     Company "1" o-- "*" Department
@@ -127,139 +115,155 @@ classDiagram
     CsvImporter ..> ActivityRecord : creates
 ```
 
-### Subsystem 2 — Analytics & Dashboard (Vanessa Mukamanzi · `7223964`)
+### Subsystem 2 — Analytics & Dashboard (S2)
 
 ```mermaid
 classDiagram
-    class ReductionTarget {
-        -int _target_id
-        -float _baseline
-        -float _target_percent
-        +configure_target(baseline, target_percent) None
-        +get_baseline() float
-        +set_baseline(baseline) None
+    class Target {
+        +String id
+        +String company_id
+        +Date baseline_start
+        +Date baseline_end
+        +Date period_start
+        +Date period_end
+        +Float reduction_percent
+        +bool data_complete
+        +configure_periods(b_start, b_end, p_start, p_end) None
         +get_target() float
-        +set_target(target_percent) None
+        +set_target(reduction_percent) None
+        +is_data_complete() bool
+        +set_data_complete(complete) None
     }
 
     class AnalyticsService {
         <<Service>>
-        -list _records
-        -ReductionTarget _target
+        -str _company_id
         -date _start_date
         -date _end_date
-        -str _category_filter
-        +reset_filters() None
+        -str _category
         +configure_filters(start_date, end_date, category) None
-        +get_records() list
-        +set_records(records) None
-        +filter_records(start_date, end_date, category) list
+        +reset_filters() None
+        +filter_records(statement) Select
         +calculate_total() float
-        +group_by_category() dict
-        +calculate_score() float
+        +group_by_category() list
+        +get_monthly_totals() list
+        +calculate_score(baseline_kg, current_kg, reduction_percent, data_complete) dict
     }
 
     class DashboardReport {
         <<Service>>
-        -AnalyticsService _service
-        -str _report_title
-        -str _export_filename
-        +configure_report(report_title, export_filename) None
-        +get_report_title() str
-        +set_report_title(title) None
+        -dict _summary
+        -list _category_totals
+        -list _monthly_totals
+        -str _filename
+        +load_data(summary, category_totals, monthly_totals) None
         +generate_charts() dict
         +display_summary() dict
         +export_CSV() str
     }
 
-    AnalyticsService ..> ReductionTarget : uses target
-    DashboardReport --> AnalyticsService : formats result
+    class CarbonScorer {
+        <<Service>>
+        -float _min_score
+        -float _max_score
+        +configure_bounds(min_score, max_score) None
+        +reset_defaults() None
+        +calculate(baseline_kg, current_kg, reduction_percent, data_complete) dict
+    }
+
+    AnalyticsService ..> Target : evaluates
+    AnalyticsService ..> CarbonScorer : delegates scoring
+    DashboardReport ..> AnalyticsService : formats results
 ```
 
-### Subsystem 3 — AI Assistant & User Access (Junaid Ahmad · `7222074`)
+### Subsystem 3 — AI Assistant & User Access (S3)
 
 ```mermaid
 classDiagram
     class User {
-        -str _id
-        -str _company_id
-        -str _department_id
-        -str _email
-        -str _password_hash
-        -str _role
-        +initialize_account(email, password, role) None
-        +get_email() str
-        +set_email(email) None
+        +String id
+        +String company_id
+        +String department_id
+        +String email
+        +String password_hash
+        +String role
         +get_role() str
         +set_role(role) None
         +set_password(password) None
         +check_password(password) bool
-        +has_role(role) bool
+        +has_role(roles) bool
     }
 
     class ChatMessage {
-        -str _id
-        -str _user_id
-        -str _sender
-        -str _content
-        -datetime _created_at
-        +initialize_message(sender, content) None
-        +get_content() str
-        +set_content(content) None
+        +String id
+        +String user_id
+        +String sender
+        +String content
+        +DateTime created_at
         +to_dict() dict
     }
 
     class Recommendation {
-        -str _id
-        -str _department_id
-        -str _title
-        -float _est_saving_kg
-        -str _effort
-        -str _status
-        +initialize_recommendation(title, est_saving_kg, effort) None
-        +get_status() str
-        +set_status(status) None
+        +String id
+        +String company_id
+        +String department_id
+        +String title
+        +Float est_saving_kg
+        +Float est_cost_eur
+        +String effort
+        +String status
         +accept() None
-        +mark_done() None
         +reject() None
+        +mark_done() None
     }
 
     class AuthService {
         <<Service>>
-        -str _default_company_id
-        -dict _users_by_email
-        -User _active_user
-        +reset_session() None
-        +register(email, password, role, company_id, department_id) User
-        +login(email, password) User
-        +require_role(role, user) bool
+        +register(company_name, email, password, departments, name) User
+        +create_user(admin, email, password, role, department_id, name) User
+        +authenticate(email, password) User
+        +login(email, password, remember) User
+        +logout() None
+    }
+
+    class AIClient {
+        <<Service>>
+        -str _model
+        -float _timeout
+        -int _max_tokens
+        -int _daily_limit
+        +configure(model, timeout, max_tokens, daily_limit) None
+        +from_config() AIClient
+        +requests_today(company_id) int
+        +complete(messages, company_id, kind, user_id, json_output) str
     }
 
     class PromptBuilder {
         <<Service>>
         -str _system_prompt
         -int _max_hotspots
-        +configure_templates(system_prompt, max_hotspots) None
-        +get_system_prompt() str
-        +set_system_prompt(prompt) None
-        +build_context(company_id, category_totals) dict
-        +advice_prompt(hotspots, department_name) str
+        +reset_templates() None
+        +build_context(company_id, start, end) dict
+        +chat_messages(summary, question, history) list
+        +advice_prompt(summary, department, annual_kg) list
+        +summary_prompt(summary, month_label) list
     }
 
     class AIAssistant {
         <<Service>>
-        -str _model
-        -PromptBuilder _prompt_builder
-        -list _history
-        +configure_assistant(model, clear_history) None
-        +get_model() str
-        +set_model(model) None
-        +ask(user, question, context) ChatMessage
-        +recommend(department_id, hotspots) list
-        +summarise(month, category_totals) str
+        -AIClient _client
+        -PromptBuilder _prompts
+        -int _history_limit
+        +reset_defaults() None
+        +from_app() AIAssistant
+        +ask(user, question) ChatMessage
+        +recommend(company_id, department_id, user_id) list
+        +summarise(company_id, month, user_id) str
     }
 
+    User "1" --> "*" ChatMessage : owns
     AuthService ..> User : manages
+    AIAssistant --> AIClient : uses
     AIAssistant --> PromptBuilder : uses
     AIAssistant ..> ChatMessage : stores
     AIAssistant ..> Recommendation : creates
@@ -267,24 +271,14 @@ classDiagram
 
 ---
 
-## Running the OOP Verification Demo
-
-No external libraries are required (Python 3.10+ standard library only):
-
-```bash
-python demo.py
-```
-
----
-
 ## Real-Time Stream Processing Pipeline (Hometask 2)
 
-Our event-driven stream processing framework (`app/data_collection/stream_processing.py`) ingests live operational telemetry (`flight_booking`, `server_utility_log`, `freight_logistics`), filters events by GHG Protocol Scope tags (Scope 1, Scope 2, Scope 3), and transforms activity metrics into metric tons of CO₂e emissions:
+Our event-driven telemetry pipeline (`app/data_collection/stream_processing.py`) ingests live operational events (`flight_booking`, `server_utility_log`, `freight_logistics`), filters events by GHG Scope (1, 2, or 3), and transforms activity metrics into metric tons of CO₂e:
 
-1. **Abstract Base Classes (ABCs):** `StreamProcessor(ABC)` defines the uniform processor contract with `@abstractmethod def process(record)`.
-2. **Inheritance & Polymorphism:** `ScopeFilter`, `MetricTonCO2eTransformer`, and `CompositeStreamProcessor` inherit from `StreamProcessor` and implement `process(record)`.
-3. **Operator Overloading:** `StreamProcessor` overloads both `__or__` (`|`) and `__add__` (`+`) for intuitive pipeline composition (`ScopeFilter(3) | MetricTonCO2eTransformer()`).
-4. **Iterators & Generators:** `TelemetryStream` implements `__iter__` and `__next__`; `StreamProcessor.process_stream()` lazily `yield`s transformed records.
+- **Abstract Base Class:** `StreamProcessor(ABC)` with `@abstractmethod process(record)`.
+- **Inheritance & Polymorphism:** `ScopeFilter`, `MetricTonCO2eTransformer`, and `CompositeStreamProcessor`.
+- **Operator Overloading:** Compose multi-stage pipelines intuitively via `|` (`__or__`) or `+` (`__add__`), e.g. `pipeline = ScopeFilter(target_scopes=3) | MetricTonCO2eTransformer()`.
+- **Iterators & Generators:** `TelemetryStream` implements `__iter__` and `__next__`; `StreamProcessor.process_stream()` yields transformed records lazily.
 
 ### Stream Processing Class Diagram
 
@@ -336,15 +330,78 @@ classDiagram
     StreamProcessor <|-- ScopeFilter
     StreamProcessor <|-- MetricTonCO2eTransformer
     TelemetryStream "1" o-- "*" TelemetryRecord : yields
-    StreamProcessor ..> TelemetryRecord : filters & transforms
+    StreamProcessor ..> TelemetryRecord : transforms
 ```
 
-### 5-Minute Walkthrough Video
+### 5-Minute Walkthrough Video (Hometask 2)
 
 - **Video Link:**
 
-### Running the Stream Pipeline Demo
+---
+
+## Technologies & Database Layer (Hometask 3)
+
+- **Backend & Web APIs:** Python 3.12+, Flask 3, Flask-Login, Jinja2, REST JSON endpoints & CSV export
+- **Database Access Layer (SQLAlchemy ORM):**
+  - **Local development:** SQLite (`sqlite:///carbon_dev.db`)
+  - **Docker Compose:** PostgreSQL 16 (`postgresql+psycopg://...`)
+  - **MySQL compatible:** `PyMySQL` included (`mysql+pymysql://carbon_user:password@localhost:3306/carbon_tracker`)
+- **Analytics & AI:** pandas, Plotly, OpenAI Python SDK (`gpt-4o-mini` default)
+
+---
+
+## Local Setup
+
+Create and activate a virtual environment:
+
+```powershell
+# Windows PowerShell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+Copy-Item .env.example .env
+```
 
 ```bash
-python demo_stream.py
+# macOS / Linux
+python -m venv .venv
+source .venv/bin/activate
+cp -n .env.example .env
 ```
+
+Install dependencies:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Configure `.env` (supports SQLite locally, PostgreSQL in Docker, or MySQL):
+
+```env
+SECRET_KEY=replace-with-a-random-local-secret
+DATABASE_URL=sqlite:///carbon_dev.db
+ANALYTICS_DEV_COMPANY_ID=123e4567-e89b-12d3-a456-426614174000
+OPENAI_API_KEY=your-openai-api-key
+```
+
+Seed the local sample company and emission factors, then start the server:
+
+```bash
+python seed.py
+python run.py
+```
+
+*(Alternatively, run with Flask CLI: `python -m flask --app run:app run --debug`.)*
+
+Open http://127.0.0.1:5000.
+
+---
+
+## Carbon Score
+
+The score shows progress towards a company's reduction target. For example, a company with a baseline of 100 kg CO₂e and a 20% reduction target receives 50/100 when its emissions fall to 90 kg CO₂e. Scoring requires completed reporting periods, a positive baseline, and confirmation of complete, comparable data; otherwise, the score displays an unavailable state.
+
+---
+
+## Team Workflow
+
+We work on feature branches and review changes before merging. Shared model changes are discussed with the affected subsystem owners. Do not commit `.env`, API keys, local databases, virtual environments, or real company data. Further documentation is in `docs/architecture.md` and `docs/data-contract.md`.

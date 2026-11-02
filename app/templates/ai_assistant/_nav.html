@@ -1,0 +1,7 @@
+{% set active = request.endpoint %}
+<nav class="ai-tabs" aria-label="AI assistant">
+  <a href="{{ url_for('assistant.index') }}" {% if active == 'assistant.index' %}aria-current="page"{% endif %}>Chat</a>
+  <a href="{{ url_for('assistant.recommendations') }}" {% if active == 'assistant.recommendations' %}aria-current="page"{% endif %}>Reduction tips</a>
+  <a href="{{ url_for('assistant.summary') }}" {% if active == 'assistant.summary' %}aria-current="page"{% endif %}>Monthly summary</a>
+</nav>
+{% include "user_access/_flashes.html" %}

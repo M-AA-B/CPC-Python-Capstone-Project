@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/user_access.css') }}">{% endblock %}
+{% block content %}
+<section class="ua-card">
+  <h1>My account</h1>
+  {% include "user_access/_flashes.html" %}
+  <dl class="ua-details">
+    <dt>Name</dt><dd>{{ current_user.name or "-" }}</dd>
+    <dt>Email</dt><dd>{{ current_user.email }}</dd>
+    <dt>Company</dt><dd>{{ current_user.company.name if current_user.company else "-" }}</dd>
+    <dt>Department</dt><dd>{{ current_user.department.name if current_user.department else "-" }}</dd>
+    <dt>Role</dt><dd><span class="ua-role">{{ current_user.role }}</span></dd>
+  </dl>
+  <div class="ua-actions">
+    {% if current_user.is_admin %}<a class="ua-button" href="{{ url_for('access.users') }}">Manage users</a>{% endif %}
+    <form method="post" action="{{ url_for('access.logout') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="ua-secondary">Log out</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

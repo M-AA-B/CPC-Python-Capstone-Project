@@ -1,92 +1,104 @@
-"""S1 Domain Model: ActivityRecord (Owner: Mohammed Al-Amine Bennani · 7222047)."""
-from __future__ import annotations
-
 import uuid
-from datetime import date
+from datetime import datetime, timezone
 
-from .emission_factor import EmissionFactor
+from app.extensions import db
 
 
-class ActivityRecord:
-    """Represents a recorded operational emission activity linked to a factor and department (UML S1)."""
+class ActivityRecord(db.Model):
+    __tablename__ = 'activity_records'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=True)
+    department_id = db.Column(db.String(36), db.ForeignKey('departments.id'), nullable=False)
+    factor_id = db.Column(db.Integer, db.ForeignKey('emission_factors.id'), nullable=False)
+    
+    period_start = db.Column(db.Date, nullable=True)
+    period_end = db.Column(db.Date, nullable=True)
+    category = db.Column(db.String(100), nullable=True)
+    quantity = db.Column(db.Float, nullable=False, default=0.0)
+    unit = db.Column(db.String(20), nullable=True)
+    co2e_kg = db.Column(db.Float, nullable=False, default=0.0)
+    scope = db.Column(db.Integer, nullable=True)
+    
+    created_by = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
-    def __init__(
-        self,
-        department_id: str,
-        factor: EmissionFactor,
-        quantity: float,
-        unit: str,
-        record_date: date | None = None,
-        record_id: str | None = None,
-    ):
-        """Constructor: Proper state initialization."""
-        self._id: str = record_id or str(uuid.uuid4())
-        self._department_id: str = department_id
-        self._factor: EmissionFactor = factor
-        self._quantity: float = 0.0
-        self._unit: str = ""
-        self._co2e_kg: float = 0.0
-        self._record_date: date = record_date or date.today()
-        self.initialize_record(quantity=quantity, unit=unit, record_date=self._record_date)
+    # Synonyms / Aliases to support both naming conventions
+    emission_factor_id = db.synonym('factor_id')
+    user_id = db.synonym('created_by')
+    activity_value = db.synonym('quantity')
+    calculated_co2e = db.synonym('co2e_kg')
 
-    def initialize_record(self, quantity: float, unit: str, record_date: date) -> None:
-        """Initialization method: assigns unit, date, and quantity and computes initial CO2e."""
-        self.set_unit(unit)
-        self.set_record_date(record_date)
-        self.set_quantity(quantity)
+    def __init__(self, **kwargs):
+        """Constructor: Initializes state and handles attribute aliases (Hometask 1)."""
+        if 'user_id' in kwargs and 'created_by' not in kwargs:
+            kwargs['created_by'] = kwargs.pop('user_id')
+        if 'emission_factor_id' in kwargs and 'factor_id' not in kwargs:
+            kwargs['factor_id'] = kwargs.pop('emission_factor_id')
+        if 'activity_value' in kwargs and 'quantity' not in kwargs:
+            kwargs['quantity'] = kwargs.pop('activity_value')
+        if 'calculated_co2e' in kwargs and 'co2e_kg' not in kwargs:
+            kwargs['co2e_kg'] = kwargs.pop('calculated_co2e')
+        super().__init__(**kwargs)
 
-    def get_id(self) -> str:
-        return self._id
-
-    def get_department_id(self) -> str:
-        return self._department_id
-
-    def get_factor(self) -> EmissionFactor:
-        return self._factor
-
-    def get_category(self) -> str:
-        return self._factor.get_category()
-
-    def get_scope(self) -> int:
-        return self._factor.get_scope()
-
+    # --- Explicit Accessor & Mutator Methods (Hometask 1 Encapsulation) ---
     def get_quantity(self) -> float:
-        return self._quantity
+        """Accessor (getter) for quantity."""
+        return self.quantity
 
     def set_quantity(self, value: float) -> None:
+        """Mutator (setter) for quantity with input validation."""
         val = float(value)
         if val < 0:
-            raise ValueError("Quantity cannot be negative.")
-        self._quantity = val
-        self._co2e_kg = round(self._quantity * self._factor.get_kg_co2e_per_unit(), 2)
+            raise ValueError("Activity quantity cannot be negative.")
+        self.quantity = val
+        if self.factor and hasattr(self.factor, 'kg_co2e_per_unit'):
+            self.co2e_kg = round(self.quantity * self.factor.kg_co2e_per_unit, 2)
 
     def get_unit(self) -> str:
-        return self._unit
+        """Accessor (getter) for unit."""
+        return self.unit or ""
 
-    def set_unit(self, unit: str) -> None:
-        cleaned = (unit or "").strip()
-        if not cleaned:
+    def set_unit(self, value: str) -> None:
+        """Mutator (setter) for unit."""
+        if not value:
             raise ValueError("Unit cannot be empty.")
-        self._unit = cleaned
+        self.unit = str(value)
 
     def get_co2e_kg(self) -> float:
-        return self._co2e_kg
-
-    def get_calculated_co2e_kg(self) -> float:
-        return self._co2e_kg
-
-    def get_record_date(self) -> date:
-        return self._record_date
-
-    def set_record_date(self, record_date: date) -> None:
-        if not isinstance(record_date, date):
-            raise TypeError("record_date must be a datetime.date instance.")
-        self._record_date = record_date
+        """Accessor (getter) for calculated co2e_kg."""
+        return self.co2e_kg
 
     def is_valid(self) -> bool:
-        """UML method: verifies non-negative quantity and matching factor unit."""
-        return self._quantity >= 0 and self._unit.lower() == self._factor.get_unit().lower()
+        """Validates that quantity is non-negative and dates are consistent (UML S1)."""
+        if self.quantity is None or self.quantity < 0:
+            return False
+        if self.period_start and self.period_end and self.period_start > self.period_end:
+            return False
+        return True
 
     def update_quantity(self, new_val: float) -> None:
-        """UML method: updates quantity and recalculates CO2e emissions."""
+        """Updates quantity and recalculates CO2e emissions in real-time (UML S1)."""
         self.set_quantity(new_val)
+
+    def to_dict(self) -> dict:
+        """Serializes record to dictionary for JSON output."""
+        return {
+            "id": self.id,
+            "company_id": self.company_id,
+            "department_id": self.department_id,
+            "factor_id": self.factor_id,
+            "period_start": self.period_start.isoformat() if self.period_start else None,
+            "period_end": self.period_end.isoformat() if self.period_end else None,
+            "date": self.period_start.isoformat() if self.period_start else None,
+            "category": self.category,
+            "quantity": self.quantity,
+            "activity_value": self.quantity,
+            "unit": self.unit,
+            "co2e_kg": self.co2e_kg,
+            "calculated_co2e": self.co2e_kg,
+            "scope": self.scope,
+            "created_by": self.created_by,
+            "user_id": self.created_by,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }

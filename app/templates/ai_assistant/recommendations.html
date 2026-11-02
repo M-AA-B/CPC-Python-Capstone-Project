@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/assistant.css') }}">{% endblock %}
+{% block content %}
+<h1>Reduction tips</h1>
+{% include "ai_assistant/_nav.html" %}
+<p class="ai-muted">AI recommendations per department, with estimated saving, cost and effort.</p>
+
+{% if can_edit %}
+<form method="post" action="{{ url_for('assistant.generate_recommendations') }}" class="ai-row">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <select name="department_id" required aria-label="Department">
+    <option value="">Choose department…</option>
+    {% for department in departments %}
+      <option value="{{ department.id }}">{{ department.name }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Get AI tips</button>
+</form>
+{% endif %}
+
+<nav class="ai-filter" aria-label="Filter by status">
+  <a href="{{ url_for('assistant.recommendations') }}" {% if not current_status %}aria-current="page"{% endif %}>All</a>
+  {% for status in statuses %}
+    <a href="{{ url_for('assistant.recommendations', status=status) }}" {% if current_status == status %}aria-current="page"{% endif %}>{{ status|title }}</a>
+  {% endfor %}
+</nav>
+
+<div class="tip-grid">
+{% for tip in recommendations %}
+  <article class="tip-card">
+    <div class="tip-head">
+      <span class="ai-muted">{{ tip.department.name if tip.department else "" }}</span>
+      <span class="tip-status tip-{{ tip.status }}">{{ tip.status }}</span>
+    </div>
+    <h2>{{ tip.title }}</h2>
+    <p>{{ tip.description }}</p>
+    <ul class="tip-facts">
+      <li><strong>{{ "{:,.0f}".format(tip.est_saving_kg) }}</strong> kg CO₂e / year</li>
+      <li>{{ "€{:,.0f}".format(tip.est_cost_eur) if tip.est_cost_eur is not none else "cost unknown" }}</li>
+      <li>{{ tip.effort }} effort</li>
+    </ul>
+    {% if can_edit and tip.status not in ('done', 'rejected') %}
+    <div class="ai-row">
+      {% for action, label in [("accept", "Accept"), ("reject", "Reject"), ("done", "Mark done")] %}
+        {% if not (action == "accept" and tip.status == "accepted") %}
+        <form method="post" action="{{ url_for('assistant.update_recommendation', recommendation_id=tip.id, action=action, status=current_status) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="tip-{{ action }}">{{ label }}</button>
+        </form>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </article>
+{% else %}
+  <p class="ai-muted">No tips yet.{% if can_edit %} Choose a department above and click “Get AI tips”.{% endif %}</p>
+{% endfor %}
+</div>
+{% endblock %}

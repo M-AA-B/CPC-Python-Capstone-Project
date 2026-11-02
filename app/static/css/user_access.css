@@ -1,0 +1,23 @@
+/* S3 - User Access pages (login, register, account, users). Uses the colours from main.css. */
+.ua-card { max-width: 28rem; margin: 1rem 0 2rem; padding: 1.5rem; border: 1px solid #d5e3dc; border-radius: 8px; }
+.ua-card h1, .ua-card h2 { margin-top: 0; }
+.ua-card form { display: flex; flex-direction: column; gap: 0.35rem; }
+.ua-card label { font-weight: 600; margin-top: 0.5rem; }
+.ua-card input, .ua-card select { padding: 0.5rem; border: 1px solid #b9cec4; border-radius: 4px; font: inherit; }
+.ua-card label.ua-check { font-weight: normal; display: flex; align-items: center; gap: 0.4rem; }
+button, .ua-button { margin-top: 0.75rem; padding: 0.55rem 1rem; border: 0; border-radius: 4px; background: #176749;
+  color: white; font: inherit; cursor: pointer; text-decoration: none; display: inline-block; }
+button.ua-secondary { background: #5c7a6d; }
+.ua-muted { color: #5c7a6d; font-size: 0.9rem; }
+.ua-alert { padding: 0.75rem 1rem; border-radius: 4px; margin-bottom: 1rem; }
+.ua-alert-success { background: #d1fae5; color: #065f46; }
+.ua-alert-danger { background: #fee2e2; color: #991b1b; }
+.ua-alert-info { background: #e0ecff; color: #1e3a8a; }
+.ua-details { display: grid; grid-template-columns: max-content 1fr; gap: 0.4rem 1rem; }
+.ua-details dt { font-weight: 600; }
+.ua-details dd { margin: 0; }
+.ua-actions { display: flex; gap: 1rem; align-items: center; }
+.ua-actions form { display: inline; }
+.ua-role { padding: 0.1rem 0.5rem; border-radius: 999px; background: #e3efe9; font-size: 0.85rem; }
+.ua-table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.ua-table th, .ua-table td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #d5e3dc; }

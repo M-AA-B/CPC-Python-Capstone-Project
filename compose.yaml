@@ -1,0 +1,41 @@
+services:
+  web:
+    build: .
+    command: python run.py
+    volumes:
+      - .:/app
+    ports:
+      - "0.0.0.0:5000:5000"
+    environment:
+      FLASK_APP: run.py
+      FLASK_DEBUG: "1"
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-super-secure-12345}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-carbon_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-carbon_tracker}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-carbon_tracker}
+      POSTGRES_USER: ${POSTGRES_USER:-carbon_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  adminer:
+    image: adminer
+    ports:
+      - "127.0.0.1:3333:8080"
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

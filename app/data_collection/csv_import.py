@@ -1,97 +1,80 @@
-"""S1 Service Class: CsvImporter (Owner: Mohammed Al-Amine Bennani · 7222047)."""
-from __future__ import annotations
-
 import csv
 import io
-from datetime import date
-
-from app.models import ActivityRecord
-from .calculations import EmissionCalculator
+from app.data_collection.services import create_activity_record
 
 
 class CsvImporter:
-    """Service class for reading, validating, and importing CSV activity rows (UML S1)."""
+    """Service class for batch processing and validating CSV activity files (UML S1 & Hometask 1)."""
 
-    def __init__(self, calculator: EmissionCalculator, encoding: str = "utf-8"):
-        """Constructor: Proper state initialization."""
-        self._calculator: EmissionCalculator = calculator
-        self._encoding: str = "utf-8"
+    def __init__(self, encoding: str = 'utf-8'):
+        """Constructor: Proper state initialization (Hometask 1)."""
+        self._encoding = encoding
         self._error_log: list[str] = []
-        self._pending_rows: list[dict] = []
-        self._saved_records: list[ActivityRecord] = []
-        self.encoding = encoding
-        self.initialize_session()
+        self._valid_count: int = 0
 
-    # --- Initialization / Setup Method ---
+    # --- Initialization Methods (Hometask 1) ---
     def initialize_session(self) -> None:
-        """Clears error logs and staged CSV rows before starting a new import batch."""
+        """Resets import counters and error logs for a new upload session."""
         self._error_log.clear()
-        self._pending_rows.clear()
+        self._valid_count = 0
 
-    # --- Encapsulation: Getters & Setters ---
+    # --- Encapsulation: Getters & Setters (Hometask 1) ---
     @property
     def encoding(self) -> str:
+        """Getter for file encoding."""
         return self._encoding
 
     @encoding.setter
     def encoding(self, value: str) -> None:
-        cleaned = (value or "").strip()
-        if not cleaned:
+        """Setter for encoding."""
+        if not value:
             raise ValueError("Encoding cannot be empty.")
-        self._encoding = cleaned
+        self._encoding = value
 
     @property
     def error_log(self) -> list[str]:
+        """Accessor (getter) for error log list."""
         return list(self._error_log)
 
     @property
-    def saved_records(self) -> list[ActivityRecord]:
-        return list(self._saved_records)
+    def valid_count(self) -> int:
+        """Accessor (getter) for number of successfully imported records."""
+        return self._valid_count
 
-    # --- UML Domain Methods ---
-    def read_file(self, csv_source: str) -> list[dict]:
-        """UML method: reads CSV rows from a file path or raw CSV text."""
+    def process(self, file_storage, user_id: str) -> dict:
+        """Parses, validates, and imports records from an uploaded CSV file stream."""
         self.initialize_session()
-        if "\n" in csv_source:
-            stream = io.StringIO(csv_source)
-            rows = list(csv.DictReader(stream))
+
+        # Handle file stream or bytes
+        if hasattr(file_storage, 'stream'):
+            stream = io.TextIOWrapper(file_storage.stream, encoding=self._encoding)
+        elif isinstance(file_storage, (bytes, bytearray)):
+            stream = io.StringIO(file_storage.decode(self._encoding))
+        elif hasattr(file_storage, 'read'):
+            raw = file_storage.read()
+            if isinstance(raw, bytes):
+                raw = raw.decode(self._encoding)
+            stream = io.StringIO(raw)
         else:
-            with open(csv_source, mode="r", encoding=self._encoding, newline="") as handle:
-                rows = list(csv.DictReader(handle))
-        self._pending_rows = rows
-        return list(rows)
+            raise ValueError("Unsupported file format or stream.")
 
-    def validate_row(self, row: dict) -> bool:
-        """UML method: checks required CSV columns, positive quantity, and matching factor."""
-        try:
-            category = (row.get("category") or "").strip()
-            quantity = float(row.get("quantity", -1))
-            unit = (row.get("unit") or "").strip()
-            rec_date = date.fromisoformat((row.get("record_date") or "").strip())
-            factor = self._calculator.fetch_factor(category, rec_date.year)
-            if not category or quantity < 0 or factor is None:
-                return False
-            return factor.get_unit().lower() == unit.lower()
-        except (TypeError, ValueError):
-            return False
+        reader = csv.DictReader(stream)
+        if not reader.fieldnames:
+            raise ValueError("CSV file is empty or missing headers.")
 
-    def save_valid_rows(self) -> list[ActivityRecord]:
-        """UML method: converts valid staged CSV rows into ActivityRecord instances."""
-        created: list[ActivityRecord] = []
-        for idx, row in enumerate(self._pending_rows, start=1):
-            if not self.validate_row(row):
-                self._error_log.append(f"Row {idx}: validation failed for {row!r}")
-                continue
-            rec_date = date.fromisoformat(row["record_date"].strip())
-            factor = self._calculator.fetch_factor(row["category"], rec_date.year)
-            assert factor is not None
-            record = ActivityRecord(
-                department_id=row.get("department_id", "default-dept"),
-                factor=factor,
-                quantity=float(row["quantity"]),
-                unit=row["unit"].strip(),
-                record_date=rec_date,
-            )
-            created.append(record)
-            self._saved_records.append(record)
-        return created
+        for row_idx, row in enumerate(reader, start=1):
+            try:
+                self.validate_and_save_row(row, user_id)
+                self._valid_count += 1
+            except Exception as e:
+                self._error_log.append(f"Row {row_idx}: {str(e)}")
+
+        return {
+            "inserted": self._valid_count,
+            "errors": self.error_log,
+            "total_rows": self._valid_count + len(self._error_log)
+        }
+
+    def validate_and_save_row(self, row: dict, user_id: str):
+        """Validates and creates an individual activity record from a CSV row."""
+        return create_activity_record(row, user_id)

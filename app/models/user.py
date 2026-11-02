@@ -1,93 +1,87 @@
-"""S3 Domain Models: User, ChatMessage, Recommendation.
+"""S3 - User Access. Owner: Junaid.
 
-Owner: Junaid Ahmad (7222074)
+A user belongs to one company and (for managers and employees) one department.
+S1 and S2 use the logged-in user via flask_login.current_user, e.g. current_user.company_id.
 """
-from __future__ import annotations
-
-import hashlib
-import secrets
 import uuid
 from datetime import datetime, timezone
 
+from flask_login import UserMixin
+from werkzeug.security import check_password_hash, generate_password_hash
 
-class User:
-    """Represents an authenticated platform user with company/department scope and role (UML S3)."""
+from app.extensions import db
 
-    VALID_ROLES = ("admin", "manager", "employee")
 
-    def __init__(
-        self,
-        company_id: str,
-        email: str,
-        password: str,
-        role: str = "employee",
-        department_id: str | None = None,
-        user_id: str | None = None,
-    ):
-        """Constructor: Proper state initialization."""
-        self._id: str = user_id or str(uuid.uuid4())
-        self._company_id: str = company_id
-        self._department_id: str | None = department_id
-        self._email: str = ""
-        self._password_hash: str = ""
-        self._role: str = "employee"
-        self.initialize_account(email=email, password=password, role=role)
+class Role:
+    """The three roles. Stored as plain text in users.role."""
 
-    # --- Initialization / Setup Method ---
-    def initialize_account(self, email: str, password: str, role: str = "employee") -> None:
-        """Normalizes email, validates role, and hashes initial password."""
-        self.set_email(email)
-        self.set_role(role)
-        self.set_password(password)
+    ADMIN = "admin"        # manages the company, departments and users
+    MANAGER = "manager"    # enters activity data, sets targets, uses the AI assistant
+    EMPLOYEE = "employee"  # views the dashboard and tips
 
-    # --- Encapsulation: Getters & Setters ---
-    def get_id(self) -> str:
-        return self._id
+    ALL = (ADMIN, MANAGER, EMPLOYEE)
 
-    def get_company_id(self) -> str:
-        return self._company_id
 
-    def get_department_id(self) -> str | None:
-        return self._department_id
+class User(UserMixin, db.Model):
+    __tablename__ = 'users'
 
-    def set_department_id(self, department_id: str | None) -> None:
-        self._department_id = department_id
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    name = db.Column(db.String(100), nullable=True)
 
-    def get_email(self) -> str:
-        return self._email
+    # Nullable so older seed/test users (id, email, name only) still work.
+    company_id = db.Column(db.String(36), db.ForeignKey('companies.id'), nullable=True, index=True)
+    # None for admins, who are not part of a single department.
+    department_id = db.Column(db.String(36), db.ForeignKey('departments.id'), nullable=True)
+    password_hash = db.Column(db.String(255), nullable=True)
+    role = db.Column(db.String(20), nullable=False, default=Role.EMPLOYEE)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
-    def set_email(self, email: str) -> None:
-        cleaned = (email or "").strip().lower()
-        if "@" not in cleaned:
-            raise ValueError("Invalid email address.")
-        self._email = cleaned
+    __table_args__ = (
+        db.CheckConstraint("role IN ('admin', 'manager', 'employee')", name="ck_user_role"),
+    )
 
+    company = db.relationship('Company', backref='users')
+    department = db.relationship('Department')
+
+    def __init__(self, **kwargs):
+        """Constructor: Proper state initialization (Hometask 1)."""
+        kwargs.setdefault("role", Role.EMPLOYEE)
+        super().__init__(**kwargs)
+
+    # --- Encapsulation: Getters & Setters (Hometask 1) ---
     def get_role(self) -> str:
-        return self._role
+        """Accessor (getter) for user role."""
+        return self.role
 
     def set_role(self, role: str) -> None:
-        cleaned = (role or "").strip().lower()
-        if cleaned not in self.VALID_ROLES:
-            raise ValueError(f"Role must be one of {self.VALID_ROLES}.")
-        self._role = cleaned
+        """Mutator (setter) for user role with validation."""
+        if role not in Role.ALL:
+            raise ValueError(f"Unknown role: {role!r}")
+        self.role = role
 
     def set_password(self, password: str) -> None:
-        """Stores only a salted SHA-256 hash, never plaintext."""
-        if len(password or "") < 8:
-            raise ValueError("Password must be at least 8 characters.")
-        salt = secrets.token_hex(16)
-        digest = hashlib.sha256(f"{salt}:{password}".encode("utf-8")).hexdigest()
-        self._password_hash = f"{salt}${digest}"
+        """Store only a salted hash (werkzeug scrypt), never the password itself."""
+        self.password_hash = generate_password_hash(password)
 
-    # --- UML Domain Methods ---
     def check_password(self, password: str) -> bool:
-        """UML method: verifies candidate password against stored salted hash."""
-        if "$" not in self._password_hash:
+        if not self.password_hash:
             return False
-        salt, expected_digest = self._password_hash.split("$", 1)
-        candidate = hashlib.sha256(f"{salt}:{password}".encode("utf-8")).hexdigest()
-        return secrets.compare_digest(candidate, expected_digest)
+        return check_password_hash(self.password_hash, password)
 
-    def has_role(self, role: str) -> bool:
-        """UML method: returns True if the user holds the specified role."""
-        return self._role == (role or "").strip().lower()
+    def has_role(self, *roles: str) -> bool:
+        return self.role in roles
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role == Role.ADMIN
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "email": self.email,
+            "name": self.name,
+            "company_id": self.company_id,
+            "department_id": self.department_id,
+            "role": self.role,
+        }

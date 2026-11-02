@@ -1,4 +1,4 @@
-"""Subsystem 3 — User Access (Junaid Ahmad · 7222074)."""
-from .services import AuthService
+from flask import Blueprint
 
-__all__ = ["AuthService"]
+bp = Blueprint("access", __name__, url_prefix="/auth")
+from . import routes
