@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.extensions import db
 from app.models.target import Target
 
+from .exceptions import TargetValidationError
 from .scoring import calculate_target_progress
 from .services import get_emissions_summary
 
@@ -77,15 +78,15 @@ def validate_target_form(form):
             for field in date_fields
         }
     except ValueError:
-        raise ValueError("Enter valid dates for both reporting periods.") from None
+        raise TargetValidationError("Enter valid dates for both reporting periods.") from None
 
     try:
         reduction = float(form.get("reduction_percent", ""))
     except (TypeError, ValueError):
-        raise ValueError("Enter a valid reduction percentage.") from None
+        raise TargetValidationError("Enter a valid reduction percentage.") from None
 
     if not isfinite(reduction) or not 0 < reduction <= 100:
-        raise ValueError("Reduction must be greater than 0% and at most 100%.")
+        raise TargetValidationError("Reduction must be greater than 0% and at most 100%.")
 
     baseline_start = values["baseline_start"]
     baseline_end = values["baseline_end"]
@@ -93,10 +94,10 @@ def validate_target_form(form):
     period_end = values["period_end"]
 
     if baseline_start > baseline_end or period_start > period_end:
-        raise ValueError("Each start date must be on or before its end date.")
+        raise TargetValidationError("Each start date must be on or before its end date.")
 
     if baseline_end >= period_start:
-        raise ValueError("The baseline must finish before the target period.")
+        raise TargetValidationError("The baseline must finish before the target period.")
 
     for start, end in (
         (baseline_start, baseline_end),
@@ -104,7 +105,7 @@ def validate_target_form(form):
     ):
         last_day = monthrange(end.year, end.month)[1]
         if start.day != 1 or end.day != last_day:
-            raise ValueError("Select complete calendar months for both periods.")
+            raise TargetValidationError("Select complete calendar months for both periods.")
 
     baseline_months = (
         (baseline_end.year - baseline_start.year) * 12
@@ -116,12 +117,12 @@ def validate_target_form(form):
     )
 
     if baseline_months != target_months:
-        raise ValueError("Both periods must contain the same number of months.")
+        raise TargetValidationError("Both periods must contain the same number of months.")
 
     data_complete = form.get("data_complete") == "on"
 
     if data_complete and period_end >= date.today():
-        raise ValueError(
+        raise TargetValidationError(
             "Completeness can only be confirmed after the target period ends."
         )
 

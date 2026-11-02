@@ -2,6 +2,12 @@ import traceback
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from app.data_collection.calculations import EmissionCalculator, calculate_emissions, assign_scope
 from app.data_collection.csv_import import CsvImporter
+from app.data_collection.exceptions import (
+    DataCollectionError,
+    RecordOwnershipError,
+    ResourceNotFoundError,
+    ValidationError,
+)
 from app.data_collection.services import (
     create_activity_record,
     delete_activity_record,
@@ -12,6 +18,12 @@ from app.extensions import db
 from app.models.emission_factor import EmissionFactor
 
 s1_bp = Blueprint('data', __name__, url_prefix='/activities')
+
+
+@s1_bp.errorhandler(DataCollectionError)
+def handle_s1_error(error):
+    """Centralized error-handling for all Subsystem 1 custom domain exceptions (Hometask 4)."""
+    return jsonify(error.to_dict()), error.status_code
 
 
 @s1_bp.route('/', methods=['GET'])
@@ -51,7 +63,7 @@ def get_record(record_id):
     records = get_activity_records()
     record = next((r for r in records if str(r.id) == str(record_id)), None)
     if not record:
-        return jsonify({"error": f"ActivityRecord {record_id} not found."}), 404
+        raise ResourceNotFoundError("ActivityRecord", record_id)
     return jsonify(record.to_dict()), 200
 
 
@@ -65,10 +77,8 @@ def create_record():
     try:
         record = create_activity_record(data, user_id)
         return jsonify({"message": "Record created successfully", "id": str(record.id)}), 201
-    except LookupError as e:
-        return jsonify({"error": str(e)}), 404
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
+    except DataCollectionError as e:
+        return jsonify(e.to_dict()), e.status_code
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
@@ -87,10 +97,8 @@ def edit_record(record_id):
     try:
         updated = update_activity_record(record_id, data, user_id)
         return jsonify({"message": "Record updated successfully", "record": updated.to_dict()}), 200
-    except LookupError as e:
-        return jsonify({"error": str(e)}), 404
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
+    except DataCollectionError as e:
+        return jsonify(e.to_dict()), e.status_code
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
@@ -105,10 +113,8 @@ def delete_record(record_id):
     try:
         delete_activity_record(record_id, user_id)
         return jsonify({"message": "Record deleted successfully"}), 200
-    except LookupError as e:
-        return jsonify({"error": str(e)}), 404
-    except PermissionError as e:
-        return jsonify({"error": str(e)}), 403
+    except DataCollectionError as e:
+        return jsonify(e.to_dict()), e.status_code
     except PermissionError as e:
         return jsonify({"error": str(e)}), 403
     except ValueError as e:

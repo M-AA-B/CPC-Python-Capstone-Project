@@ -1,5 +1,6 @@
 from math import isfinite
 
+from .exceptions import AnalyticsError
 
 
 class CarbonScorer:
@@ -17,7 +18,7 @@ class CarbonScorer:
         low = float(min_score)
         high = float(max_score)
         if not (isfinite(low) and isfinite(high)) or low < 0 or low >= high:
-            raise ValueError("Score bounds must be finite with 0 <= min_score < max_score.")
+            raise AnalyticsError("Score bounds must be finite with 0 <= min_score < max_score.")
         self._min_score = low
         self._max_score = high
 

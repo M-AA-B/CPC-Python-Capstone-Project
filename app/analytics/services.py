@@ -8,6 +8,7 @@ from app.extensions import db
 from app.models.activity_record import ActivityRecord
 from app.models.department import Department
 
+from .exceptions import InvalidFilterError
 from .scoring import calculate_target_progress
 
 
@@ -62,7 +63,7 @@ class AnalyticsService:
     ) -> None:
         """Configures and validates date range and category filters."""
         if start_date is not None and end_date is not None and start_date > end_date:
-            raise ValueError("Start date must be on or before end date.")
+            raise InvalidFilterError("Start date must be on or before end date.")
         self._start_date = start_date
         self._end_date = end_date
         self._category = category.strip() if isinstance(category, str) else category
@@ -81,7 +82,7 @@ class AnalyticsService:
     @company_id.setter
     def company_id(self, value: str | None) -> None:
         if value is not None and not str(value).strip():
-            raise ValueError("Company ID cannot be empty.")
+            raise InvalidFilterError("Company ID cannot be empty.")
         self._company_id = str(value).strip() if value is not None else None
 
     @property
@@ -91,7 +92,7 @@ class AnalyticsService:
     @start_date.setter
     def start_date(self, value: date | None) -> None:
         if value is not None and self._end_date is not None and value > self._end_date:
-            raise ValueError("Start date must be on or before end date.")
+            raise InvalidFilterError("Start date must be on or before end date.")
         self._start_date = value
 
     @property
@@ -101,7 +102,7 @@ class AnalyticsService:
     @end_date.setter
     def end_date(self, value: date | None) -> None:
         if value is not None and self._start_date is not None and self._start_date > value:
-            raise ValueError("Start date must be on or before end date.")
+            raise InvalidFilterError("Start date must be on or before end date.")
         self._end_date = value
 
     @property

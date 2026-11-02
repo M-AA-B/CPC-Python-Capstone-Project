@@ -347,6 +347,10 @@ classDiagram
   - **Docker Compose:** PostgreSQL 16 (`postgresql+psycopg://...`)
   - **MySQL compatible:** `PyMySQL` included (`mysql+pymysql://carbon_user:password@localhost:3306/carbon_tracker`)
 - **Analytics & AI:** pandas, Plotly, OpenAI Python SDK (`gpt-4o-mini` default)
+- **Testing & Error Handling:** `pytest` + subsystem-specific exception hierarchies:
+  - **S1:** `DataCollectionError` (`ValidationError`, `UnitMismatchError`, `PeriodValidationError`, `RecordOwnershipError`, `ResourceNotFoundError`, `CompanyIsolationError`) in `app/data_collection/exceptions.py`
+  - **S2:** `AnalyticsError` (`InvalidFilterError`, `TargetValidationError`, `AnalyticsAccessError`) in `app/analytics/exceptions.py`
+  - **S3:** `AuthError` (`app/user_access/services.py`), `AIUnavailable` & `InvalidAIOutput` (`app/ai_assistant/services.py`)
 
 ---
 
@@ -399,6 +403,16 @@ Open http://127.0.0.1:5000.
 ## Carbon Score
 
 The score shows progress towards a company's reduction target. For example, a company with a baseline of 100 kg CO₂e and a 20% reduction target receives 50/100 when its emissions fall to 90 kg CO₂e. Scoring requires completed reporting periods, a positive baseline, and confirmation of complete, comparable data; otherwise, the score displays an unavailable state.
+
+---
+
+## Automated Tests (Hometask 4)
+
+Run the full test suite (127 test functions across all subsystems, OpenAI mocked):
+
+```bash
+python -m pytest -q
+```
 
 ---
 

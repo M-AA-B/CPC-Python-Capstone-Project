@@ -19,6 +19,11 @@ from app.models.company import Company
 from app.models.target import Target
 
 from . import bp
+from .exceptions import (
+    AnalyticsError,
+    InvalidFilterError,
+    TargetValidationError,
+)
 from .report import DashboardReport
 from .services import (
     AnalyticsService,
@@ -29,6 +34,12 @@ from .targets import (
     get_target_progress,
     validate_target_form,
 )
+
+
+@bp.errorhandler(AnalyticsError)
+def handle_analytics_error(error: AnalyticsError):
+    """Centralized error handler for Subsystem 2 custom exceptions (Hometask 4)."""
+    return jsonify(error.to_dict()), error.status_code
 
 
 @bp.get("/")
@@ -80,7 +91,7 @@ def index():
                     else None
                 )
             except ValueError:
-                raise ValueError(
+                raise InvalidFilterError(
                     "Enter valid dates in YYYY-MM-DD format."
                 ) from None
 
@@ -95,9 +106,9 @@ def index():
                 filters["category"]
                 and filters["category"] not in categories
             ):
-                raise ValueError("Select an available category.")
+                raise InvalidFilterError("Select an available category.")
 
-        except ValueError as exc:
+        except InvalidFilterError as exc:
             error = str(exc)
         else:
             summary = service.get_summary()
@@ -177,7 +188,7 @@ def target_form():
 
         try:
             values = validate_target_form(request.form)
-        except ValueError as exc:
+        except TargetValidationError as exc:
             error = str(exc)
         else:
             target = Target(company_id=company.id, **values)

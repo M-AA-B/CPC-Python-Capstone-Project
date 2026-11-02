@@ -72,10 +72,12 @@ class Target(db.Model):
         period_end: date,
     ) -> None:
         """Configures and validates baseline and target reporting date windows."""
+        from app.analytics.exceptions import TargetValidationError
+
         if baseline_start > baseline_end or period_start > period_end:
-            raise ValueError("Each start date must be on or before its end date.")
+            raise TargetValidationError("Each start date must be on or before its end date.")
         if baseline_end >= period_start:
-            raise ValueError("The baseline must finish before the target period.")
+            raise TargetValidationError("The baseline must finish before the target period.")
         self.baseline_start = baseline_start
         self.baseline_end = baseline_end
         self.period_start = period_start
@@ -88,12 +90,14 @@ class Target(db.Model):
 
     def set_target(self, reduction_percent: float) -> None:
         """Mutator (setter) for target reduction percentage with validation (UML S2)."""
+        from app.analytics.exceptions import TargetValidationError
+
         try:
             value = float(reduction_percent)
         except (TypeError, ValueError):
-            raise ValueError("Enter a valid reduction percentage.") from None
+            raise TargetValidationError("Enter a valid reduction percentage.") from None
         if not isfinite(value) or not 0 < value <= 100:
-            raise ValueError("Reduction must be greater than 0% and at most 100%.")
+            raise TargetValidationError("Reduction must be greater than 0% and at most 100%.")
         self.reduction_percent = value
 
     def is_data_complete(self) -> bool:

@@ -43,6 +43,10 @@ DEFAULTS = {
 logger = logging.getLogger(__name__)
 
 
+class AIUnavailable(Exception):
+    """The AI could not give an answer. The message is safe to show to the user."""
+
+
 def _setting(name: str) -> str:
     """App config first (used by tests), then the environment, then the default."""
     value = current_app.config.get(name)
@@ -153,11 +157,11 @@ class AIClient:
 
     def complete(self, messages: list[dict], company_id: str, kind: str,
                  user_id: str | None = None, json_output: bool = False) -> str:
-        """Send `messages` to OpenAI and return the answer text, or raise RuntimeError."""
+        """Send `messages` to OpenAI and return the answer text, or raise AIUnavailable."""
         if self._client is None:
-            raise RuntimeError("The AI assistant is not set up yet (missing OPENAI_API_KEY).")
+            raise AIUnavailable("The AI assistant is not set up yet (missing OPENAI_API_KEY).")
         if self.requests_today(company_id) >= self.daily_limit:
-            raise RuntimeError("Your company has reached today's AI request limit. Please try again tomorrow.")
+            raise AIUnavailable("Your company has reached today's AI request limit. Please try again tomorrow.")
 
         log = AIRequest(company_id=company_id, user_id=user_id, kind=kind)
         db.session.add(log)
@@ -171,18 +175,22 @@ class AIClient:
             )
             content = (response.choices[0].message.content or "").strip()
             if not content:
-                raise RuntimeError(FALLBACK_MESSAGE)
+                raise AIUnavailable(FALLBACK_MESSAGE)
             log.succeeded = True
             log.total_tokens = response.usage.total_tokens if response.usage else None
             return content
         except openai.OpenAIError:
             logger.exception("OpenAI request failed")
-            raise RuntimeError(FALLBACK_MESSAGE) from None
+            raise AIUnavailable(FALLBACK_MESSAGE) from None
         finally:
             db.session.commit()
 
 
 # --- recommendation JSON validation ----------------------------------------
+
+class InvalidAIOutput(ValueError):
+    pass
+
 
 def _number(value) -> float | None:
     # bool is a subclass of int, but True is not a valid saving
@@ -193,27 +201,27 @@ def _number(value) -> float | None:
 
 def validate_recommendation(item, max_saving_kg: float) -> dict:
     if not isinstance(item, dict):
-        raise ValueError("recommendation is not an object")
+        raise InvalidAIOutput("recommendation is not an object")
 
     title = str(item.get("title") or "").strip()
     description = str(item.get("description") or "").strip()
     if not title or not description:
-        raise ValueError("title or description missing")
+        raise InvalidAIOutput("title or description missing")
 
     saving = _number(item.get("est_saving_kg"))
     # A saving larger than the department's yearly emissions cannot come from our data
     if saving is None or not 0 <= saving <= max_saving_kg:
-        raise ValueError(f"est_saving_kg out of range: {item.get('est_saving_kg')!r}")
+        raise InvalidAIOutput(f"est_saving_kg out of range: {item.get('est_saving_kg')!r}")
 
     cost = item.get("est_cost_eur")
     if cost is not None:
         cost = _number(cost)
         if cost is None or cost < 0:
-            raise ValueError(f"invalid est_cost_eur: {item.get('est_cost_eur')!r}")
+            raise InvalidAIOutput(f"invalid est_cost_eur: {item.get('est_cost_eur')!r}")
 
     effort = str(item.get("effort") or "").strip().lower()
     if effort not in Effort.ALL:
-        raise ValueError(f"invalid effort: {item.get('effort')!r}")
+        raise InvalidAIOutput(f"invalid effort: {item.get('effort')!r}")
 
     return {
         "title": title[:200],
@@ -229,22 +237,22 @@ def parse_recommendations(raw: str, max_saving_kg: float) -> list[dict]:
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
-        raise ValueError("answer is not valid JSON") from None
+        raise InvalidAIOutput("answer is not valid JSON") from None
 
     items = parsed.get("recommendations") if isinstance(parsed, dict) else None
     if not isinstance(items, list):
-        raise ValueError('missing "recommendations" list')
+        raise InvalidAIOutput('missing "recommendations" list')
 
     valid = []
     for item in items:
         try:
             valid.append(validate_recommendation(item, max_saving_kg))
-        except ValueError as error:
+        except InvalidAIOutput as error:
             logger.warning("Skipped AI recommendation: %s", error)
         if len(valid) == MAX_RECOMMENDATIONS:
             break
     if not valid:
-        raise ValueError("no valid recommendations")
+        raise InvalidAIOutput("no valid recommendations")
     return valid
 
 
@@ -336,7 +344,7 @@ class AIAssistant:
         messages = self.prompts.chat_messages(summary, question, self.history(user.id, self._history_limit))
 
         asked_at = _utcnow()
-        # Raises RuntimeError; then nothing is saved
+        # Raises AIUnavailable; then nothing is saved
         answer = self.client.complete(messages, user.company_id, "chat", user.id)
 
         db.session.add(ChatMessage(user_id=user.id, sender=Sender.USER, content=question, created_at=asked_at))
@@ -358,7 +366,7 @@ class AIAssistant:
         months = max(len(summary["by_month"]), 1)
         annual_kg = department_kg * 12 / months
         if annual_kg <= 0:
-            raise RuntimeError(f"There is no emission data for {department.name} yet.")
+            raise AIUnavailable(f"There is no emission data for {department.name} yet.")
 
         raw = self.client.complete(
             self.prompts.advice_prompt(summary, department.name, annual_kg),
@@ -366,8 +374,8 @@ class AIAssistant:
         )
         try:
             items = parse_recommendations(raw, max_saving_kg=annual_kg)
-        except ValueError:
-            raise RuntimeError("The AI returned an unusable answer. Please try again.") from None
+        except InvalidAIOutput:
+            raise AIUnavailable("The AI returned an unusable answer. Please try again.") from None
 
         recommendations = [Recommendation(company_id=company_id, department_id=department_id, **item)
                            for item in items]

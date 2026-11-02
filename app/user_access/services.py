@@ -18,6 +18,10 @@ MIN_PASSWORD_LENGTH = 8
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
+class AuthError(ValueError):
+    """A problem the user can fix; the message is shown on the form."""
+
+
 @login_manager.user_loader
 def load_user(user_id: str):
     return db.session.get(User, user_id)
@@ -42,11 +46,11 @@ class AuthService:
     def _check_new_account(cls, email: str, password: str) -> str:
         email = cls.normalise_email(email)
         if not EMAIL_PATTERN.match(email) or len(email) > 120:
-            raise ValueError("Please enter a valid email address.")
+            raise AuthError("Please enter a valid email address.")
         if len(password or "") < MIN_PASSWORD_LENGTH:
-            raise ValueError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
+            raise AuthError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
         if db.session.scalar(db.select(User).filter_by(email=email)):
-            raise ValueError("An account with this email already exists.")
+            raise AuthError("An account with this email already exists.")
         return email
 
     @classmethod
@@ -55,10 +59,10 @@ class AuthService:
         """Create a new company with its departments; its first user becomes the admin."""
         company_name = (company_name or "").strip()
         if not company_name:
-            raise ValueError("Please enter a company name.")
+            raise AuthError("Please enter a company name.")
         email = cls._check_new_account(email, password)
         if db.session.scalar(db.select(Company).filter_by(name=company_name)):
-            raise ValueError("This company is already registered. Ask its admin to add you.")
+            raise AuthError("This company is already registered. Ask its admin to add you.")
 
         company = Company(name=company_name)
         db.session.add(company)
@@ -80,17 +84,17 @@ class AuthService:
                     department_id: str | None = None, name: str | None = None) -> User:
         """An admin adds a manager or employee (or another admin) to their own company."""
         if not admin.has_role(Role.ADMIN):
-            raise ValueError("Only admins can add users.")
+            raise AuthError("Only admins can add users.")
         email = cls._check_new_account(email, password)
         if role not in Role.ALL:
-            raise ValueError("Unknown role.")
+            raise AuthError("Unknown role.")
 
         if department_id:
             department = db.session.get(Department, department_id)
             if department is None or department.company_id != admin.company_id:
-                raise ValueError("Unknown department.")
+                raise AuthError("Unknown department.")
         elif role != Role.ADMIN:
-            raise ValueError("Managers and employees need a department.")
+            raise AuthError("Managers and employees need a department.")
 
         user = User(company_id=admin.company_id, department_id=department_id or None,
                     email=email, name=(name or "").strip() or None, role=role)

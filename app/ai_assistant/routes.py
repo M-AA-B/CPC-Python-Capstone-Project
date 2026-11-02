@@ -4,7 +4,7 @@ from datetime import date
 from flask import abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user
 
-from app.ai_assistant.services import MAX_QUESTION_LENGTH, AIAssistant
+from app.ai_assistant.services import MAX_QUESTION_LENGTH, AIAssistant, AIUnavailable
 from app.extensions import db
 from app.models.recommendation import Recommendation, Status
 from app.models.user import Role
@@ -40,7 +40,7 @@ def ask():
         reply = AIAssistant.from_app().ask(current_user, question)
     except ValueError as error:
         return jsonify(ok=False, error=str(error)), 400
-    except RuntimeError as error:
+    except AIUnavailable as error:
         return jsonify(ok=False, error=str(error)), 503
     return jsonify(ok=True, message=reply.to_dict())
 
@@ -79,7 +79,7 @@ def generate_recommendations():
         )
     except ValueError:
         flash("Please choose a department.", "danger")
-    except RuntimeError as error:
+    except AIUnavailable as error:
         flash(str(error), "danger")
     else:
         flash(f"{len(created)} new recommendations added.", "success")
@@ -117,6 +117,6 @@ def summary():
         check_csrf()
         try:
             text = AIAssistant.from_app().summarise(current_user.company_id, month, current_user.id)
-        except RuntimeError as error:
+        except AIUnavailable as error:
             flash(str(error), "danger")
     return render_template("ai_assistant/summary.html", month=month, month_value=month_value, text=text)

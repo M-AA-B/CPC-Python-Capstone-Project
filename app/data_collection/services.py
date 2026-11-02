@@ -1,5 +1,11 @@
 from datetime import datetime, timezone
 from app.data_collection.calculations import EmissionCalculator, calculate_emissions, assign_scope as _assign_scope
+from app.data_collection.exceptions import (
+    CompanyIsolationError,
+    RecordOwnershipError,
+    ResourceNotFoundError,
+    ValidationError,
+)
 from app.data_collection.validators import validate_activity_period, validate_unit_match
 from app.extensions import db
 from app.models.activity_record import ActivityRecord
@@ -11,31 +17,31 @@ def create_activity_record(data: dict, user_id: str | None = None) -> ActivityRe
     """Creates a new activity record with full validation and transactional integrity."""
     user_id = user_id or data.get('user_id') or data.get('current_user_id')
     if not user_id:
-        raise ValueError("User ID is required.")
+        raise ValidationError("User ID is required.")
 
     # 1. Resolve and fetch emission factor
     factor_id = data.get('emission_factor_id') or data.get('factor_id')
     if factor_id is None:
-        raise ValueError("Emission factor ID is required.")
+        raise ValidationError("Emission factor ID is required.")
     try:
         factor_id = int(factor_id)
     except (ValueError, TypeError):
-        raise ValueError(f"Invalid emission factor ID: {factor_id}")
+        raise ValidationError(f"Invalid emission factor ID: {factor_id}")
 
     factor = db.session.get(EmissionFactor, factor_id)
     if not factor:
-        raise LookupError(f"Emission factor {factor_id} not found.")
+        raise ResourceNotFoundError("Emission factor", factor_id)
 
     # 2. Resolve activity quantity / value
     quantity = data.get('activity_value')
     if quantity is None:
         quantity = data.get('quantity')
     if quantity is None:
-        raise ValueError("Activity value / quantity is required.")
+        raise ValidationError("Activity value / quantity is required.")
     try:
         quantity = float(quantity)
     except (ValueError, TypeError):
-        raise ValueError(f"Invalid quantity: {quantity}")
+        raise ValidationError(f"Invalid quantity: {quantity}")
 
     # 3. Unit validation
     unit = data.get('unit') or factor.unit
@@ -74,7 +80,7 @@ def create_activity_record(data: dict, user_id: str | None = None) -> ActivityRe
         dept = db.session.get(Department, department_id)
         if dept:
             if company_id and dept.company_id and dept.company_id != company_id:
-                raise PermissionError(f"Department {department_id} does not belong to company {company_id}.")
+                raise CompanyIsolationError(department_id, company_id)
             if not company_id:
                 company_id = dept.company_id
 
@@ -144,9 +150,9 @@ def update_activity_record(record_id: str, data: dict, user_id: str) -> Activity
     """Updates an existing activity record with ownership enforcement (S1 FR9)."""
     record = db.session.get(ActivityRecord, record_id)
     if not record:
-        raise LookupError(f"ActivityRecord {record_id} not found.")
+        raise ResourceNotFoundError("ActivityRecord", record_id)
     if record.created_by != user_id:
-        raise PermissionError("You can only edit your own records.")
+        raise RecordOwnershipError("You can only edit your own records.")
 
     # Update quantity and recalculate emissions if provided
     if 'quantity' in data or 'activity_value' in data:
@@ -177,9 +183,9 @@ def delete_activity_record(record_id: str, user_id: str) -> bool:
     """Deletes an activity record with ownership enforcement (S1 FR9)."""
     record = db.session.get(ActivityRecord, record_id)
     if not record:
-        raise LookupError(f"ActivityRecord {record_id} not found.")
+        raise ResourceNotFoundError("ActivityRecord", record_id)
     if record.created_by != user_id:
-        raise PermissionError("You can only delete your own records.")
+        raise RecordOwnershipError("You can only delete your own records.")
 
     db.session.delete(record)
     db.session.commit()

@@ -4,7 +4,7 @@ from flask_login import current_user, login_user
 
 from app.models.user import Role
 from app.user_access.permissions import check_csrf, require_role
-from app.user_access.services import MIN_PASSWORD_LENGTH, AuthService
+from app.user_access.services import MIN_PASSWORD_LENGTH, AuthError, AuthService
 
 from . import bp
 
@@ -52,7 +52,7 @@ def register():
         form = request.form
         try:
             if form.get("password", "") != form.get("confirm", ""):
-                raise ValueError("Passwords do not match.")
+                raise AuthError("Passwords do not match.")
             user = AuthService.register(
                 form.get("company_name", ""),
                 form.get("email", ""),
@@ -60,7 +60,7 @@ def register():
                 form.get("departments", "").split(","),
                 name=form.get("name"),
             )
-        except ValueError as error:
+        except AuthError as error:
             flash(str(error), "danger")
         else:
             login_user(user)
@@ -94,7 +94,7 @@ def users():
                 form.get("department_id") or None,
                 name=form.get("name"),
             )
-        except ValueError as error:
+        except AuthError as error:
             flash(str(error), "danger")
         else:
             flash(f"User {form.get('email', '').strip().lower()} added.", "success")

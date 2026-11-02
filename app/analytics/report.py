@@ -1,6 +1,7 @@
 """S2 — DashboardReport OOP class for chart generation, summaries, and CSV export (UML S2 & Hometask 1)."""
 
 from .charts import build_category_chart, build_monthly_chart
+from .exceptions import AnalyticsError
 from .exports import build_analytics_csv
 from .services import compare_latest_months
 
@@ -43,7 +44,7 @@ class DashboardReport:
     @summary.setter
     def summary(self, value: dict) -> None:
         if not isinstance(value, dict):
-            raise ValueError("Summary must be a dictionary.")
+            raise AnalyticsError("Summary must be a dictionary.")
         self._summary = {
             "record_count": int(value.get("record_count", 0)),
             "total_emissions": float(value.get("total_emissions", 0.0)),
@@ -56,7 +57,7 @@ class DashboardReport:
     @category_totals.setter
     def category_totals(self, value: list[dict]) -> None:
         if not isinstance(value, list):
-            raise ValueError("Category totals must be a list.")
+            raise AnalyticsError("Category totals must be a list.")
         self._category_totals = list(value)
 
     @property
@@ -66,7 +67,7 @@ class DashboardReport:
     @monthly_totals.setter
     def monthly_totals(self, value: list[dict]) -> None:
         if not isinstance(value, list):
-            raise ValueError("Monthly totals must be a list.")
+            raise AnalyticsError("Monthly totals must be a list.")
         self._monthly_totals = list(value)
 
     @property
@@ -77,7 +78,7 @@ class DashboardReport:
     def filename(self, value: str) -> None:
         cleaned = (value or "").strip()
         if not cleaned or not cleaned.endswith(".csv"):
-            raise ValueError("Export filename must be a non-empty .csv name.")
+            raise AnalyticsError("Export filename must be a non-empty .csv name.")
         self._filename = cleaned
 
     # --- UML Domain Methods (UML S2) ---
@@ -108,3 +109,4 @@ class DashboardReport:
 
     # Exact UML diagram method alias
     export_CSV = export_csv
+
