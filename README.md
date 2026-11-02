@@ -1,8 +1,8 @@
-# Enterprise Carbon Footprint Tracker & AI Assistant — Hometask 1 (OOP Concepts)
+# Enterprise Carbon Footprint Tracker & AI Assistant — Hometask 1 & 2
 
 **Group 13 — Compact Programming, FH Dortmund**
 
-This branch (`Homeassignment1`) contains the pure Object-Oriented Programming (OOP) translation of our Group 13 Capstone Project UML class diagrams across all three subsystems. Every class implements explicit state initialization (`__init__`), configuration/setup methods, and encapsulated getters & setters with domain validation.
+This branch (`HomeworkAssignment2`) builds on `Homeassignment1` by adding our event-driven **Real-Time Telemetry Stream Processing** framework (`app/data_collection/stream_processing.py`) on top of the OOP subsystem classes of our Group 13 Capstone Project UML class diagrams across all three subsystems. Every class implements explicit state initialization (`__init__`), configuration/setup methods, and encapsulated getters & setters with domain validation.
 
 ---
 
@@ -273,4 +273,78 @@ No external libraries are required (Python 3.10+ standard library only):
 
 ```bash
 python demo.py
+```
+
+---
+
+## Real-Time Stream Processing Pipeline (Hometask 2)
+
+Our event-driven stream processing framework (`app/data_collection/stream_processing.py`) ingests live operational telemetry (`flight_booking`, `server_utility_log`, `freight_logistics`), filters events by GHG Protocol Scope tags (Scope 1, Scope 2, Scope 3), and transforms activity metrics into metric tons of CO₂e emissions:
+
+1. **Abstract Base Classes (ABCs):** `StreamProcessor(ABC)` defines the uniform processor contract with `@abstractmethod def process(record)`.
+2. **Inheritance & Polymorphism:** `ScopeFilter`, `MetricTonCO2eTransformer`, and `CompositeStreamProcessor` inherit from `StreamProcessor` and implement `process(record)`.
+3. **Operator Overloading:** `StreamProcessor` overloads both `__or__` (`|`) and `__add__` (`+`) for intuitive pipeline composition (`ScopeFilter(3) | MetricTonCO2eTransformer()`).
+4. **Iterators & Generators:** `TelemetryStream` implements `__iter__` and `__next__`; `StreamProcessor.process_stream()` lazily `yield`s transformed records.
+
+### Stream Processing Class Diagram
+
+```mermaid
+classDiagram
+    class TelemetryRecord {
+        -str _event_id
+        -str _source
+        -int _scope
+        -float _activity_metric
+        -str _unit
+        -float _calculated_co2e_metric_tons
+        +to_dict() dict
+    }
+
+    class TelemetryStream {
+        -list _events
+        -int _index
+        +add_event(event) None
+        +__iter__() TelemetryStream
+        +__next__() TelemetryRecord
+        +__len__() int
+    }
+
+    class StreamProcessor {
+        <<abstract>>
+        +process(record)* TelemetryRecord
+        +__or__(other) CompositeStreamProcessor
+        +__add__(other) CompositeStreamProcessor
+        +process_stream(stream) Iterator
+    }
+
+    class CompositeStreamProcessor {
+        +list processors
+        +process(record) TelemetryRecord
+    }
+
+    class ScopeFilter {
+        -set _target_scopes
+        +process(record) TelemetryRecord
+    }
+
+    class MetricTonCO2eTransformer {
+        -dict _factors
+        +process(record) TelemetryRecord
+    }
+
+    StreamProcessor <|-- CompositeStreamProcessor
+    StreamProcessor <|-- ScopeFilter
+    StreamProcessor <|-- MetricTonCO2eTransformer
+    TelemetryStream "1" o-- "*" TelemetryRecord : yields
+    StreamProcessor ..> TelemetryRecord : filters & transforms
+```
+
+### 5-Minute Walkthrough Video
+
+- **Video Link:**
+
+### Running the Stream Pipeline Demo
+
+```bash
+python demo_stream.py
 ```
