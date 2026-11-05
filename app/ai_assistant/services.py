@@ -63,6 +63,7 @@ class AIClient:
     def __init__(self, api_key: str, model: str, timeout: float = 10.0,
                  max_tokens: int = 600, daily_limit: int = 200):
         """Constructor: Proper state initialization (Hometask 1)."""
+        self._client = None
         self._model = "gpt-4o-mini"
         self._timeout = 10.0
         self._max_tokens = 600
@@ -121,6 +122,9 @@ class AIClient:
         if seconds <= 0:
             raise ValueError("Timeout must be greater than 0 seconds.")
         self._timeout = seconds
+        # The OpenAI client keeps its own copy of the timeout, so hand it the new value too
+        if self._client is not None:
+            self._client = self._client.with_options(timeout=seconds)
 
     @property
     def max_tokens(self) -> int:

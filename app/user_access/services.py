@@ -31,6 +31,10 @@ def register_user_access(app) -> None:
     def forbidden(_error):
         return render_template("user_access/403.html"), 403
 
+    # S3 JSON API (/api/s3/...). Imported here, not at the top, to avoid a circular import.
+    from app.ai_assistant.api import api_bp
+    app.register_blueprint(api_bp)
+
 
 class AuthService:
 
