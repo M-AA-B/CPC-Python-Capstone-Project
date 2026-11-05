@@ -200,7 +200,7 @@ class ChatApiTests(S3ApiTestCase):
 
 class RepositoryTests(S3ApiTestCase):
     def test_repository_needs_a_company(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(PermissionError):  # AccessDeniedError since Hometask 4
             UserRepository("")
 
     def test_get_never_crosses_companies(self):

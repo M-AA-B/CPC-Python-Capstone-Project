@@ -8,6 +8,7 @@ from app.models.ai_request import AIRequest
 from app.models.chat_message import ChatMessage
 from app.models.recommendation import Recommendation, Status
 from app.models.user import Role, User
+from app.user_access.exceptions import AccessDeniedError, InvalidInputError, WorkflowError
 from app.user_access.repositories import CompanyScopedRepository
 
 
@@ -34,7 +35,7 @@ class RecommendationRepository(CompanyScopedRepository):
         query = self.visible_to(user)
         if status:
             if status not in Status.ALL:
-                raise ValueError(f"Unknown status: {status!r}")
+                raise InvalidInputError(f"Unknown status: {status!r}")
             query = query.filter_by(status=status)
         if department_id:
             query = query.filter_by(department_id=department_id)
@@ -44,11 +45,11 @@ class RecommendationRepository(CompanyScopedRepository):
         return db.session.scalar(self.visible_to(user).filter(Recommendation.id == recommendation_id))
 
     def change_status(self, recommendation: Recommendation, new_status: str) -> Recommendation:
-        """Moves a tip along its workflow. ValueError if the step is not allowed."""
+        """Moves a tip along its workflow. WorkflowError if the step is not allowed."""
         if new_status not in Status.ALL:
-            raise ValueError(f"Unknown status: {new_status!r}")
+            raise InvalidInputError(f"Unknown status: {new_status!r}")
         if new_status not in self.ALLOWED_TRANSITIONS[recommendation.status]:
-            raise ValueError(f"A {recommendation.status} recommendation cannot become {new_status}.")
+            raise WorkflowError(recommendation.status, new_status)
         recommendation.status = new_status
         self.save(recommendation)
         return recommendation
@@ -74,7 +75,7 @@ class ChatMessageRepository(CompanyScopedRepository):
     def save(self, item) -> None:
         owner = db.session.get(User, item.user_id)
         if owner is None or owner.company_id != self._company_id:
-            raise PermissionError("Cannot save a message for a user of another company.")
+            raise AccessDeniedError("Cannot save a message for a user of another company.")
         db.session.add(item)
         db.session.commit()
 

@@ -26,6 +26,16 @@ from app.models.ai_request import AIRequest
 from app.models.chat_message import ChatMessage, Sender
 from app.models.department import Department
 from app.models.recommendation import Effort, Recommendation
+# S3 error hierarchy (Hometask 4); AIUnavailable and InvalidAIOutput stay importable from here
+from app.user_access.exceptions import (  # noqa: F401
+    AINotConfiguredError,
+    AIRateLimitError,
+    AIUnavailable,
+    InvalidAIOutput,
+    InvalidQuestionError,
+    NoEmissionDataError,
+    UnknownDepartmentError,
+)
 
 FALLBACK_MESSAGE = "The AI assistant is not available right now. Please try again in a few minutes."
 MAX_QUESTION_LENGTH = 1000
@@ -41,10 +51,6 @@ DEFAULTS = {
 }
 
 logger = logging.getLogger(__name__)
-
-
-class AIUnavailable(Exception):
-    """The AI could not give an answer. The message is safe to show to the user."""
 
 
 def _setting(name: str) -> str:
@@ -163,9 +169,9 @@ class AIClient:
                  user_id: str | None = None, json_output: bool = False) -> str:
         """Send `messages` to OpenAI and return the answer text, or raise AIUnavailable."""
         if self._client is None:
-            raise AIUnavailable("The AI assistant is not set up yet (missing OPENAI_API_KEY).")
+            raise AINotConfiguredError()
         if self.requests_today(company_id) >= self.daily_limit:
-            raise AIUnavailable("Your company has reached today's AI request limit. Please try again tomorrow.")
+            raise AIRateLimitError(details={"daily_limit": self.daily_limit})
 
         log = AIRequest(company_id=company_id, user_id=user_id, kind=kind)
         db.session.add(log)
@@ -191,10 +197,6 @@ class AIClient:
 
 
 # --- recommendation JSON validation ----------------------------------------
-
-class InvalidAIOutput(ValueError):
-    pass
-
 
 def _number(value) -> float | None:
     # bool is a subclass of int, but True is not a valid saving
@@ -340,9 +342,9 @@ class AIAssistant:
         """Answer a question about the user's company emissions. Saves question and answer."""
         question = (question or "").strip()
         if not question:
-            raise ValueError("Please enter a question.")
+            raise InvalidQuestionError()
         if len(question) > MAX_QUESTION_LENGTH:
-            raise ValueError(f"Please keep questions under {MAX_QUESTION_LENGTH} characters.")
+            raise InvalidQuestionError(f"Please keep questions under {MAX_QUESTION_LENGTH} characters.")
 
         summary = self.prompts.build_context(user.company_id)
         messages = self.prompts.chat_messages(summary, question, self.history(user.id, self._history_limit))
@@ -363,14 +365,14 @@ class AIAssistant:
         """Generate and save reduction tips for one department."""
         department = db.session.get(Department, department_id) if department_id else None
         if department is None or department.company_id != company_id:
-            raise ValueError("Unknown department.")
+            raise UnknownDepartmentError(department_id or None)
 
         summary = self.prompts.build_context(company_id)
         department_kg = summary["by_department"].get(department.name, 0.0)
         months = max(len(summary["by_month"]), 1)
         annual_kg = department_kg * 12 / months
         if annual_kg <= 0:
-            raise AIUnavailable(f"There is no emission data for {department.name} yet.")
+            raise NoEmissionDataError(department.name)
 
         raw = self.client.complete(
             self.prompts.advice_prompt(summary, department.name, annual_kg),

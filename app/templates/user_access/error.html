@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/user_access.css') }}">{% endblock %}
+{% block content %}
+<section class="ua-card">
+  <h1>Something went wrong</h1>
+  <p>{{ error.message }}</p>
+  <p><a href="javascript:history.back()">Go back</a> · <a href="{{ url_for('home') }}">Home page</a></p>
+</section>
+{% endblock %}

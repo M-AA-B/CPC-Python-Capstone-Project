@@ -12,14 +12,11 @@ from app.extensions import db, login_manager
 from app.models.company import Company
 from app.models.department import Department
 from app.models.user import Role, User
+from app.user_access.exceptions import AuthError, S3ErrorHandler  # noqa: F401  (AuthError re-exported)
 from app.user_access.permissions import csrf_token
 
 MIN_PASSWORD_LENGTH = 8
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-
-class AuthError(ValueError):
-    """A problem the user can fix; the message is shown on the form."""
 
 
 @login_manager.user_loader
@@ -30,6 +27,8 @@ def load_user(user_id: str):
 def register_user_access(app) -> None:
     """Called once from create_app()."""
     app.jinja_env.globals["csrf_token"] = csrf_token
+    # Every S3Error raised anywhere becomes a JSON answer (/api/) or the S3 error page
+    S3ErrorHandler(app)
 
     @app.errorhandler(403)
     def forbidden(_error):

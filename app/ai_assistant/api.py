@@ -1,6 +1,7 @@
 """S3 JSON Web API (Hometask 3) — Owner: Junaid Ahmad · 7222074.
 
-All endpoints live under /api/s3 and answer in JSON, including errors.
+All endpoints live under /api/s3 and answer in JSON, including errors:
+S3 errors (app/user_access/exceptions.py) are turned into JSON by S3ErrorHandler.
 Login uses the normal session cookie; every request after login is checked
 for role and company, and every POST/PATCH needs the X-CSRFToken header
 (the token comes back from /login and /me).
@@ -27,6 +28,7 @@ from app.ai_assistant.repositories import (
 )
 from app.ai_assistant.services import AIAssistant, _setting
 from app.models.user import Role
+from app.user_access.exceptions import InvalidCredentialsError, InvalidInputError, ResourceNotFoundError
 from app.user_access.permissions import check_csrf, csrf_token, require_role
 from app.user_access.repositories import UserRepository
 from app.user_access.services import AuthService
@@ -45,17 +47,8 @@ def _json_body() -> dict:
     """The request's JSON object; anything else is a 400."""
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
-        raise _BadRequest("Send a JSON object with Content-Type: application/json.")
+        raise InvalidInputError("Send a JSON object with Content-Type: application/json.")
     return body
-
-
-class _BadRequest(Exception):
-    pass
-
-
-@api_bp.errorhandler(_BadRequest)
-def _bad_request(error):
-    return _error(400, str(error))
 
 
 def _http_error(error: HTTPException):
@@ -87,7 +80,7 @@ def login():
     body = _json_body()
     user = AuthService.login(str(body.get("email", "")), str(body.get("password", "")))
     if user is None:
-        return _error(401, "Wrong email or password.")
+        raise InvalidCredentialsError()
     return jsonify(_user_payload(user))
 
 
@@ -106,10 +99,7 @@ def me():
 @api_bp.get("/users")
 @require_role(Role.ADMIN)
 def users():
-    try:
-        items = UserRepository(current_user.company_id).list(role=request.args.get("role") or None)
-    except ValueError as error:
-        return _error(400, str(error))
+    items = UserRepository(current_user.company_id).list(role=request.args.get("role") or None)
     return jsonify(ok=True, users=[u.to_dict() for u in items])
 
 
@@ -118,11 +108,8 @@ def users():
 @api_bp.get("/recommendations")
 def list_recommendations():
     repo = RecommendationRepository(current_user.company_id)
-    try:
-        items = repo.list_for(current_user, status=request.args.get("status") or None,
-                              department_id=request.args.get("department_id") or None)
-    except ValueError as error:
-        return _error(400, str(error))
+    items = repo.list_for(current_user, status=request.args.get("status") or None,
+                          department_id=request.args.get("department_id") or None)
     return jsonify(ok=True, recommendations=[r.to_dict() for r in items])
 
 
@@ -130,7 +117,7 @@ def list_recommendations():
 def get_recommendation(recommendation_id: str):
     item = RecommendationRepository(current_user.company_id).get_for(current_user, recommendation_id)
     if item is None:
-        return _error(404, "Recommendation not found.")
+        raise ResourceNotFoundError("Recommendation", recommendation_id)
     return jsonify(ok=True, recommendation=item.to_dict())
 
 
@@ -142,11 +129,8 @@ def update_recommendation(recommendation_id: str):
     repo = RecommendationRepository(current_user.company_id)
     item = repo.get_for(current_user, recommendation_id)
     if item is None:
-        return _error(404, "Recommendation not found.")
-    try:
-        repo.change_status(item, str(body.get("status", "")))
-    except ValueError as error:
-        return _error(409, str(error))
+        raise ResourceNotFoundError("Recommendation", recommendation_id)
+    repo.change_status(item, str(body.get("status", "")))  # WorkflowError -> 409
     return jsonify(ok=True, recommendation=item.to_dict())
 
 
@@ -157,7 +141,7 @@ def chat_history():
     try:
         limit = int(request.args.get("limit", 50))
     except ValueError:
-        return _error(400, "limit must be a whole number.")
+        raise InvalidInputError("limit must be a whole number.") from None
     limit = max(1, min(limit, MAX_HISTORY))
     messages = ChatMessageRepository(current_user.company_id).history(current_user.id, limit)
     return jsonify(ok=True, messages=[m.to_dict() for m in messages])
@@ -167,12 +151,8 @@ def chat_history():
 def chat():
     check_csrf()
     question = str(_json_body().get("question", ""))
-    try:
-        reply = AIAssistant.from_app().ask(current_user, question)
-    except ValueError as error:
-        return _error(400, str(error))
-    except RuntimeError as error:
-        return _error(503, str(error))
+    # InvalidQuestionError -> 400, AIRateLimitError -> 429, AIUnavailable -> 503
+    reply = AIAssistant.from_app().ask(current_user, question)
     return jsonify(ok=True, message=reply.to_dict())
 
 

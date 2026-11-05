@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from app.extensions import db
 from app.models.user import Role, User
+from app.user_access.exceptions import AccessDeniedError, InvalidInputError
 
 
 class CompanyScopedRepository:
@@ -21,7 +22,7 @@ class CompanyScopedRepository:
 
     def __init__(self, company_id: str):
         if not company_id:
-            raise ValueError("A repository needs the company of the logged-in user.")
+            raise AccessDeniedError("A repository needs the company of the logged-in user.")
         self._company_id = company_id
 
     def get_company_id(self) -> str:
@@ -42,7 +43,7 @@ class CompanyScopedRepository:
 
     def save(self, item) -> None:
         if getattr(item, "company_id", self._company_id) != self._company_id:
-            raise PermissionError("Cannot save a row that belongs to another company.")
+            raise AccessDeniedError("Cannot save a row that belongs to another company.")
         db.session.add(item)
         db.session.commit()
 
@@ -54,6 +55,6 @@ class UserRepository(CompanyScopedRepository):
         query = self._scoped_query()
         if role:
             if role not in Role.ALL:
-                raise ValueError(f"Unknown role: {role!r}")
+                raise InvalidInputError(f"Unknown role: {role!r}")
             query = query.filter_by(role=role)
         return list(db.session.scalars(query.order_by(User.email)))

@@ -350,7 +350,7 @@ classDiagram
 - **Testing & Error Handling:** `pytest` + subsystem-specific exception hierarchies:
   - **S1:** `DataCollectionError` (`ValidationError`, `UnitMismatchError`, `PeriodValidationError`, `RecordOwnershipError`, `ResourceNotFoundError`, `CompanyIsolationError`) in `app/data_collection/exceptions.py`
   - **S2:** `AnalyticsError` (`InvalidFilterError`, `TargetValidationError`, `AnalyticsAccessError`) in `app/analytics/exceptions.py`
-  - **S3:** `AuthError` (`app/user_access/services.py`), `AIUnavailable` & `InvalidAIOutput` (`app/ai_assistant/services.py`)
+  - **S3:** `S3Error` (`AuthError`, `InvalidCredentialsError`, `AccessDeniedError`, `ResourceNotFoundError`, `InvalidInputError`, `WorkflowError`, `AIUnavailable`, `AIRateLimitError`, `InvalidAIOutput`, ...) and the `S3ErrorHandler` class in `app/user_access/exceptions.py`
 
 ### Subsystem 3 Web API & Database Access Layer (Junaid Ahmad · `7222074`)
 
@@ -484,11 +484,80 @@ The score shows progress towards a company's reduction target. For example, a co
 
 ## Automated Tests (Hometask 4)
 
-Run the full test suite (127 test functions across all subsystems, OpenAI mocked):
+Run the full test suite (230 tests across all subsystems, OpenAI mocked):
 
 ```bash
 python -m pytest -q
 ```
+
+### Subsystem 3 Error Handling (Junaid Ahmad · `7222074`)
+
+All S3 errors share one base class, `S3Error`, in `app/user_access/exceptions.py`. Each error carries an HTTP `status_code`, a message that is safe to show, optional `details`, and `to_dict()` for JSON.
+Each error also inherits from the matching built-in exception (`ValueError`, `PermissionError`, `LookupError`, `RuntimeError`), so existing `except ValueError:` code keeps working.
+
+```mermaid
+classDiagram
+    class S3Error {
+        +int status_code
+        +str message
+        +dict details
+        +to_dict() dict
+    }
+    class AuthError
+    class InvalidCredentialsError
+    class AccessDeniedError
+    class ResourceNotFoundError
+    class UnknownDepartmentError
+    class InvalidInputError
+    class InvalidQuestionError
+    class WorkflowError
+    class AIError
+    class AIUnavailable
+    class AINotConfiguredError
+    class AIRateLimitError
+    class NoEmissionDataError
+    class InvalidAIOutput
+    class S3ErrorHandler {
+        -str _error_template
+        -dict _handled
+        +init_app(app) None
+        +handle(error) Response
+        +handled_counts() dict
+        +wants_json() bool
+    }
+    S3Error <|-- AuthError
+    AuthError <|-- InvalidCredentialsError
+    S3Error <|-- AccessDeniedError
+    S3Error <|-- ResourceNotFoundError
+    ResourceNotFoundError <|-- UnknownDepartmentError
+    S3Error <|-- InvalidInputError
+    InvalidInputError <|-- InvalidQuestionError
+    S3Error <|-- WorkflowError
+    S3Error <|-- AIError
+    AIError <|-- AIUnavailable
+    AIUnavailable <|-- AINotConfiguredError
+    AIUnavailable <|-- AIRateLimitError
+    AIUnavailable <|-- NoEmissionDataError
+    AIError <|-- InvalidAIOutput
+    S3ErrorHandler ..> S3Error : handles
+```
+
+| Status | S3 error |
+|---|---|
+| 400 | `AuthError`, `InvalidInputError`, `InvalidQuestionError` |
+| 401 | `InvalidCredentialsError` |
+| 403 | `AccessDeniedError` |
+| 404 | `ResourceNotFoundError`, `UnknownDepartmentError` |
+| 409 | `WorkflowError` |
+| 422 | `NoEmissionDataError` |
+| 429 | `AIRateLimitError` |
+| 502 | `InvalidAIOutput` |
+| 503 | `AIError`, `AIUnavailable`, `AINotConfiguredError` |
+
+`S3ErrorHandler` is installed once in `register_user_access()`. It logs every S3 error (5xx at ERROR level), counts errors by type, and answers with JSON for `/api/` requests or with the S3 error page otherwise.
+The S3 JSON API raises these errors and leaves the response to the handler: for example `WorkflowError` → `409`, `AIRateLimitError` → `429`, `AINotConfiguredError` → `503`.
+
+S3 tests: `tests/test_s3_exceptions.py` (error hierarchy, status codes, handler), `tests/test_s3_api.py` (API and repositories), `tests/test_ai_assistant.py`, `tests/test_ai_prompts.py`, `tests/test_user_access.py`, `tests/test_s3_oop.py`.
 
 ---
 
