@@ -352,6 +352,82 @@ classDiagram
   - **S2:** `AnalyticsError` (`InvalidFilterError`, `TargetValidationError`, `AnalyticsAccessError`) in `app/analytics/exceptions.py`
   - **S3:** `AuthError` (`app/user_access/services.py`), `AIUnavailable` & `InvalidAIOutput` (`app/ai_assistant/services.py`)
 
+### Subsystem 3 Web API & Database Access Layer (Junaid Ahmad · `7222074`)
+
+**JSON API** (`app/ai_assistant/api.py`, all under `/api/s3`). Every answer is JSON, including errors (`{"ok": false, "error": "..."}`).
+Login uses the session cookie; `POST`/`PATCH` requests need the `X-CSRFToken` header returned by `/login` and `/me`.
+
+| Method | Endpoint | Who | Purpose |
+|---|---|---|---|
+| POST | `/api/s3/login` | anyone | Log in with `{"email", "password"}` |
+| POST | `/api/s3/logout` | logged in | Log out |
+| GET | `/api/s3/me` | logged in | Current user and CSRF token |
+| GET | `/api/s3/users?role=` | admin | Users of the admin's company |
+| GET | `/api/s3/recommendations?status=&department_id=` | logged in | Reduction tips (employees: own department only) |
+| GET | `/api/s3/recommendations/<id>` | logged in | One tip |
+| PATCH | `/api/s3/recommendations/<id>` | admin, manager | `{"status": "accepted" \| "rejected" \| "done"}` |
+| GET | `/api/s3/chat/history?limit=` | logged in | Own chat messages, oldest first |
+| POST | `/api/s3/chat` | logged in | Ask the AI coach `{"question"}` |
+| GET | `/api/s3/ai-usage` | admin | OpenAI requests and tokens used today |
+
+Status codes: `401` not logged in, `403` wrong role, `404` not found or another company's data, `409` workflow step not allowed (a rejected or done tip cannot be reopened), `503` AI not available.
+
+**Database access layer** (`app/user_access/repositories.py`, `app/ai_assistant/repositories.py`):
+`CompanyScopedRepository` binds every query to the logged-in user's company, so another company's rows are never returned, even for a guessed id.
+`UserRepository`, `RecommendationRepository`, `ChatMessageRepository` (company reached through a join on `users`) and `AIRequestRepository` inherit from it.
+
+```mermaid
+classDiagram
+    class CompanyScopedRepository {
+        +model
+        -str _company_id
+        +get_company_id() str
+        +get(item_id)
+        +list() list
+        +count() int
+        +save(item) None
+    }
+    class UserRepository {
+        +list(role) list
+    }
+    class RecommendationRepository {
+        +dict ALLOWED_TRANSITIONS
+        +list_for(user, status, department_id) list
+        +get_for(user, recommendation_id) Recommendation
+        +change_status(recommendation, new_status) Recommendation
+    }
+    class ChatMessageRepository {
+        +history(user_id, limit) list
+    }
+    class AIRequestRepository {
+        +count_today() int
+        +tokens_today() int
+    }
+    CompanyScopedRepository <|-- UserRepository
+    CompanyScopedRepository <|-- RecommendationRepository
+    CompanyScopedRepository <|-- ChatMessageRepository
+    CompanyScopedRepository <|-- AIRequestRepository
+```
+
+**Running on MySQL.** Set `MYSQL_PASSWORD` and `MYSQL_ROOT_PASSWORD` in `.env`, then:
+
+```bash
+docker compose -f compose.yaml -f compose.mysql.yaml up --build
+```
+
+`compose.mysql.yaml` adds a MySQL 8.4 container and points `DATABASE_URL` at it (`mysql+pymysql://...?charset=utf8mb4`); `run.py` creates the tables. Without Docker, point `DATABASE_URL` at any MySQL 8 server. `cryptography` is in `requirements.txt` because PyMySQL needs it for MySQL 8 logins.
+
+**Example session** (PowerShell, app running on port 5000):
+
+```powershell
+$s = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+$login = Invoke-RestMethod -Method Post http://127.0.0.1:5000/api/s3/login -WebSession $s `
+  -ContentType "application/json" -Body '{"email": "you@company.de", "password": "yourPassword"}'
+Invoke-RestMethod http://127.0.0.1:5000/api/s3/recommendations -WebSession $s
+```
+
+**Tests:** `python -m unittest discover tests` (19 tests: API, permissions, company isolation, repositories, MySQL table definitions).
+
 ---
 
 ## Local Setup

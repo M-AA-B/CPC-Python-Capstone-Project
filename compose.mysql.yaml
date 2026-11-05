@@ -1,0 +1,34 @@
+# Hometask 3 - run the whole app on MySQL instead of PostgreSQL (S3: Junaid Ahmad).
+#
+#   docker compose -f compose.yaml -f compose.mysql.yaml up --build
+#
+# Adds a MySQL 8.4 container and points the web app's DATABASE_URL at it.
+# The tables are created by db.create_all() in run.py. Adminer (http://127.0.0.1:3333)
+# can open it with server "mysql" and the MYSQL_USER / MYSQL_PASSWORD from .env.
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-carbon_tracker}
+      MYSQL_USER: ${MYSQL_USER:-carbon_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    environment:
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-carbon_user}:${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}@mysql:3306/${MYSQL_DATABASE:-carbon_tracker}?charset=utf8mb4
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
