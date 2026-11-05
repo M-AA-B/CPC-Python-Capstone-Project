@@ -1,6 +1,7 @@
 """S3 Service Class: PromptBuilder (Owner: Junaid Ahmad · 7222074)."""
 from __future__ import annotations
 
+import hashlib
 import json
 
 
@@ -43,15 +44,34 @@ class PromptBuilder:
         self._max_hotspots = val
 
     # --- UML Domain Methods ---
+    @staticmethod
+    def anonymise(company_id: str) -> str:
+        """Stable pseudonym for a company, so the real id never leaves the server.
+
+        sha256 instead of hash(): Python randomises hash() for strings on every run.
+        """
+        return hashlib.sha256(company_id.encode("utf-8")).hexdigest()[:12]
+
     def build_context(self, company_id: str, category_totals: dict[str, float]) -> dict:
         """UML method: builds an anonymized aggregated emission summary context."""
         total = round(sum(category_totals.values()), 2)
         ranked = sorted(category_totals.items(), key=lambda kv: kv[1], reverse=True)
         return {
-            "company_ref": hash(company_id) % 100000,
+            "company_ref": self.anonymise(company_id),
             "total_co2e_kg": total,
             "top_hotspots": dict(ranked[: self._max_hotspots]),
         }
+
+    def chat_messages(self, context: dict, question: str, history: list | None = None) -> list[dict]:
+        """Turns the aggregated context, earlier messages and the new question into OpenAI chat messages."""
+        messages = [{
+            "role": "system",
+            "content": f"{self._system_prompt}\n\nCompany data (aggregated, kg CO2e):\n{json.dumps(context)}",
+        }]
+        for message in history or []:
+            messages.append({"role": message.get_sender(), "content": message.get_content()})
+        messages.append({"role": "user", "content": question})
+        return messages
 
     def advice_prompt(self, hotspots: dict[str, float], department_name: str = "General") -> str:
         """UML method: formats an advice prompt targeting the highest-emitting categories."""

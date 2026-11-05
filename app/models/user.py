@@ -72,20 +72,30 @@ class User:
         self._role = cleaned
 
     def set_password(self, password: str) -> None:
-        """Stores only a salted SHA-256 hash, never plaintext."""
+        """Stores only a salted scrypt hash, never plaintext.
+
+        scrypt is deliberately slow, so leaked hashes are hard to brute-force
+        (a plain SHA-256 can be guessed billions of times per second).
+        """
         if len(password or "") < 8:
             raise ValueError("Password must be at least 8 characters.")
         salt = secrets.token_hex(16)
-        digest = hashlib.sha256(f"{salt}:{password}".encode("utf-8")).hexdigest()
-        self._password_hash = f"{salt}${digest}"
+        self._password_hash = f"scrypt${salt}${self._hash(password, salt)}"
 
     # --- UML Domain Methods ---
+    @staticmethod
+    def _hash(password: str, salt: str) -> str:
+        return hashlib.scrypt(
+            password.encode("utf-8"), salt=salt.encode("utf-8"), n=2**14, r=8, p=1
+        ).hex()
+
     def check_password(self, password: str) -> bool:
         """UML method: verifies candidate password against stored salted hash."""
-        if "$" not in self._password_hash:
+        parts = self._password_hash.split("$")
+        if len(parts) != 3 or parts[0] != "scrypt":
             return False
-        salt, expected_digest = self._password_hash.split("$", 1)
-        candidate = hashlib.sha256(f"{salt}:{password}".encode("utf-8")).hexdigest()
+        _method, salt, expected_digest = parts
+        candidate = self._hash(password or "", salt)
         return secrets.compare_digest(candidate, expected_digest)
 
     def has_role(self, role: str) -> bool:

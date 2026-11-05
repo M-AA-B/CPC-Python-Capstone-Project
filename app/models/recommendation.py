@@ -9,6 +9,13 @@ class Recommendation:
 
     VALID_EFFORTS = ("low", "medium", "high")
     VALID_STATUSES = ("proposed", "accepted", "rejected", "done")
+    # Which status may follow which: a rejected or finished tip cannot be reopened.
+    ALLOWED_TRANSITIONS = {
+        "proposed": ("accepted", "rejected"),
+        "accepted": ("done", "rejected"),
+        "rejected": (),
+        "done": (),
+    }
 
     def __init__(
         self,
@@ -16,6 +23,7 @@ class Recommendation:
         title: str,
         est_saving_kg: float,
         effort: str = "medium",
+        est_cost_eur: float | None = None,
         recommendation_id: str | None = None,
     ):
         """Constructor: Proper state initialization."""
@@ -23,15 +31,19 @@ class Recommendation:
         self._department_id: str = department_id
         self._title: str = ""
         self._est_saving_kg: float = 0.0
+        self._est_cost_eur: float | None = None
         self._effort: str = "medium"
         self._status: str = "proposed"
-        self.initialize_recommendation(title=title, est_saving_kg=est_saving_kg, effort=effort)
+        self.initialize_recommendation(title=title, est_saving_kg=est_saving_kg,
+                                       effort=effort, est_cost_eur=est_cost_eur)
 
     # --- Initialization / Setup Method ---
-    def initialize_recommendation(self, title: str, est_saving_kg: float, effort: str) -> None:
+    def initialize_recommendation(self, title: str, est_saving_kg: float, effort: str,
+                                  est_cost_eur: float | None = None) -> None:
         """Validates recommendation attributes and resets workflow status to proposed."""
         self.set_title(title)
         self.set_est_saving_kg(est_saving_kg)
+        self.set_est_cost_eur(est_cost_eur)
         self.set_effort(effort)
         self._status = "proposed"
 
@@ -60,6 +72,19 @@ class Recommendation:
             raise ValueError("Estimated CO2e saving cannot be negative.")
         self._est_saving_kg = round(val, 1)
 
+    def get_est_cost_eur(self) -> float | None:
+        return self._est_cost_eur
+
+    def set_est_cost_eur(self, cost_eur: float | None) -> None:
+        """None means the cost is unknown."""
+        if cost_eur is None:
+            self._est_cost_eur = None
+            return
+        val = float(cost_eur)
+        if val < 0:
+            raise ValueError("Estimated cost cannot be negative.")
+        self._est_cost_eur = round(val, 2)
+
     def get_effort(self) -> str:
         return self._effort
 
@@ -76,16 +101,30 @@ class Recommendation:
         cleaned = (status or "").strip().lower()
         if cleaned not in self.VALID_STATUSES:
             raise ValueError(f"Status must be one of {self.VALID_STATUSES}.")
+        if cleaned not in self.ALLOWED_TRANSITIONS[self._status]:
+            raise ValueError(f"A {self._status} recommendation cannot become {cleaned}.")
         self._status = cleaned
 
     # --- UML Domain Methods ---
     def accept(self) -> None:
-        self._status = "accepted"
+        """UML method: the department agrees to implement the tip."""
+        self.set_status("accepted")
 
     def mark_done(self) -> None:
-        """UML method: marks the recommendation as implemented."""
-        self._status = "done"
+        """UML method: marks an accepted recommendation as implemented."""
+        self.set_status("done")
 
     def reject(self) -> None:
         """UML method: marks the recommendation as rejected."""
-        self._status = "rejected"
+        self.set_status("rejected")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self._id,
+            "department_id": self._department_id,
+            "title": self._title,
+            "est_saving_kg": self._est_saving_kg,
+            "est_cost_eur": self._est_cost_eur,
+            "effort": self._effort,
+            "status": self._status,
+        }
