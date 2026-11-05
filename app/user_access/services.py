@@ -40,7 +40,7 @@ class AuthService:
         self,
         email: str,
         password: str,
-        role: str = "admin",
+        role: str = "employee",
         company_id: str | None = None,
         department_id: str | None = None,
     ) -> User:

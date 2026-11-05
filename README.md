@@ -12,7 +12,7 @@ This branch (`Homeassignment1`) contains the pure Object-Oriented Programming (O
 |---|---|---|---|---|
 | **Mohammed Al-Amine Bennani** | MDT | `7222047` | **S1 — Data Collection & Calculation** (`app/data_collection/`, `app/models/`) | `Company`, `Department`, `EmissionFactor`, `ActivityRecord`, `EmissionCalculator`, `CsvImporter` |
 | **Vanessa Mukamanzi** | MDT | `7223964` | **S2 — Analytics & Dashboard** (`app/analytics/`, `app/models/target.py`) | `ReductionTarget`, `AnalyticsService`, `DashboardReport` |
-| **Junaid Ahmad** | MDT | `7222074` | **S3 — AI Assistant & User Access** (`app/user_access/`, `app/ai_assistant/`, `app/models/`) | `User`, `ChatMessage`, `Recommendation`, `AuthService`, `PromptBuilder`, `AIAssistant` |
+| **Junaid Ahmad** | MDT | `7222074` | **S3 — AI Assistant & User Access** (`app/user_access/`, `app/ai_assistant/`, `app/models/`) | `User`, `ChatMessage`, `Recommendation`, `AuthService`, `PromptBuilder`, `AIClient`, `AIAssistant` |
 
 ---
 
@@ -22,12 +22,14 @@ This branch (`Homeassignment1`) contains the pure Object-Oriented Programming (O
 .
 ├── README.md
 ├── demo.py                      # Runnable OOP demonstration across S1, S2, and S3
+├── demo_s3.py                   # S3 walkthrough: every S3 class (Junaid Ahmad)
+├── tests/test_s3_classes.py     # S3 unit tests (standard-library unittest, OpenAI faked)
 └── app/
     ├── models/                  # Domain models (Company, Department, EmissionFactor, ActivityRecord, Target, User, ChatMessage, Recommendation)
     ├── data_collection/         # S1 — Mohammed Al-Amine Bennani (7222047): EmissionCalculator, CsvImporter
     ├── analytics/               # S2 — Vanessa Mukamanzi (7223964): AnalyticsService, DashboardReport, CarbonScorer
     ├── user_access/             # S3 — Junaid Ahmad (7222074): AuthService
-    └── ai_assistant/            # S3 — Junaid Ahmad (7222074): PromptBuilder, AIAssistant
+    └── ai_assistant/            # S3 — Junaid Ahmad (7222074): PromptBuilder, AIClient, AIAssistant
 ```
 
 ---
@@ -204,6 +206,8 @@ classDiagram
         -str _content
         -datetime _created_at
         +initialize_message(sender, content) None
+        +get_sender() str
+        +set_sender(sender) None
         +get_content() str
         +set_content(content) None
         +to_dict() dict
@@ -214,14 +218,18 @@ classDiagram
         -str _department_id
         -str _title
         -float _est_saving_kg
+        -float _est_cost_eur
         -str _effort
         -str _status
-        +initialize_recommendation(title, est_saving_kg, effort) None
+        +initialize_recommendation(title, est_saving_kg, effort, est_cost_eur) None
+        +get_est_cost_eur() float
+        +set_est_cost_eur(cost_eur) None
         +get_status() str
         +set_status(status) None
         +accept() None
         +mark_done() None
         +reject() None
+        +to_dict() dict
     }
 
     class AuthService {
@@ -230,6 +238,7 @@ classDiagram
         -dict _users_by_email
         -User _active_user
         +reset_session() None
+        +get_active_user() User
         +register(email, password, role, company_id, department_id) User
         +login(email, password) User
         +require_role(role, user) bool
@@ -242,28 +251,64 @@ classDiagram
         +configure_templates(system_prompt, max_hotspots) None
         +get_system_prompt() str
         +set_system_prompt(prompt) None
+        +get_max_hotspots() int
+        +set_max_hotspots(count) None
+        +anonymise(company_id) str
         +build_context(company_id, category_totals) dict
+        +chat_messages(context, question, history) list
         +advice_prompt(hotspots, department_name) str
+    }
+
+    class AIClient {
+        <<Service>>
+        -str _api_key
+        -str _model
+        -float _timeout
+        -int _max_tokens
+        -int _daily_limit
+        -int _requests_today
+        +configure(api_key, model, timeout, max_tokens, daily_limit) None
+        +reset_usage() None
+        +set_api_key(api_key) None
+        +get_model() str
+        +set_model(model) None
+        +get_timeout() float
+        +set_timeout(seconds) None
+        +is_available() bool
+        +complete(messages) str
     }
 
     class AIAssistant {
         <<Service>>
-        -str _model
+        -AIClient _client
         -PromptBuilder _prompt_builder
         -list _history
         +configure_assistant(model, clear_history) None
         +get_model() str
         +set_model(model) None
+        +get_client() AIClient
+        +set_client(client) None
         +ask(user, question, context) ChatMessage
         +recommend(department_id, hotspots) list
         +summarise(month, category_totals) str
     }
 
-    AuthService ..> User : manages
-    AIAssistant --> PromptBuilder : uses
-    AIAssistant ..> ChatMessage : stores
+    AuthService "1" o-- "*" User : manages
+    AIAssistant "1" *-- "1" AIClient : composition
+    AIAssistant "1" *-- "1" PromptBuilder : composition
+    AIAssistant "1" o-- "*" ChatMessage : history
     AIAssistant ..> Recommendation : creates
+    AIAssistant ..> User : answers
 ```
+
+**S3 design notes (Junaid Ahmad)**
+
+- `AIAssistant` is composed of a `PromptBuilder` (what to ask) and an `AIClient` (how to ask OpenAI).
+  Without `OPENAI_API_KEY`, or if OpenAI fails, it answers offline from the same aggregated figures.
+- Only aggregated, anonymised figures reach the AI: `PromptBuilder.anonymise()` replaces the company id with a stable SHA-256 pseudonym.
+- The API key is write-only (`set_api_key`, `has_api_key`) and never returned by a getter.
+- `User` stores passwords only as salted `scrypt` hashes (standard library `hashlib`).
+- `Recommendation` enforces its workflow: proposed → accepted → done, or rejected; a rejected or finished tip cannot be reopened.
 
 ---
 
@@ -274,3 +319,12 @@ No external libraries are required (Python 3.10+ standard library only):
 ```bash
 python demo.py
 ```
+
+Subsystem 3 walkthrough and unit tests:
+
+```bash
+python demo_s3.py
+python -m unittest discover tests
+```
+
+`demo_s3.py` runs offline. To let the S3 coach answer through OpenAI, `pip install openai` and set `OPENAI_API_KEY`.

@@ -2,39 +2,53 @@
 from __future__ import annotations
 
 from app.models import ChatMessage, Recommendation, User
+from .client import AIClient
 from .prompts import PromptBuilder
 
 
 class AIAssistant:
-    """AI Sustainability Coach generating answers, department tips, and monthly summaries (UML S3)."""
+    """AI Sustainability Coach generating answers, department tips, and monthly summaries (UML S3).
+
+    Composition: the assistant owns a PromptBuilder (what to ask) and an AIClient
+    (how to ask OpenAI). Without an API key it answers offline from the figures.
+    """
+
+    HISTORY_LENGTH = 6  # earlier messages sent along so follow-up questions work
 
     def __init__(
         self,
-        model: str = "gpt-4o-mini",
+        model: str | None = None,
         prompt_builder: PromptBuilder | None = None,
+        client: AIClient | None = None,
     ):
         """Constructor: Proper state initialization."""
-        self._model: str = "gpt-4o-mini"
+        self._client: AIClient = client or AIClient()
         self._prompt_builder: PromptBuilder = prompt_builder or PromptBuilder()
         self._history: list[ChatMessage] = []
         self.configure_assistant(model=model)
 
     # --- Initialization / Setup Method ---
-    def configure_assistant(self, model: str = "gpt-4o-mini", clear_history: bool = False) -> None:
+    def configure_assistant(self, model: str | None = None, clear_history: bool = False) -> None:
         """Configures active model identifier and optionally resets chat history."""
-        self.set_model(model)
+        if model is not None:
+            self.set_model(model)
         if clear_history:
             self._history.clear()
 
     # --- Encapsulation: Getters & Setters ---
     def get_model(self) -> str:
-        return self._model
+        return self._client.get_model()
 
     def set_model(self, model: str) -> None:
-        cleaned = (model or "").strip()
-        if not cleaned:
-            raise ValueError("Model name cannot be empty.")
-        self._model = cleaned
+        self._client.set_model(model)
+
+    def get_client(self) -> AIClient:
+        return self._client
+
+    def set_client(self, client: AIClient) -> None:
+        if not isinstance(client, AIClient):
+            raise TypeError("client must be an AIClient instance.")
+        self._client = client
 
     def get_prompt_builder(self) -> PromptBuilder:
         return self._prompt_builder
@@ -51,18 +65,32 @@ class AIAssistant:
     def ask(self, user: User, question: str, context: dict) -> ChatMessage:
         """UML method: records user question and returns an AI coach ChatMessage answer."""
         user_msg = ChatMessage(user_id=user.get_id(), sender="user", content=question)
+        earlier = self._history[-self.HISTORY_LENGTH:]
         self._history.append(user_msg)
 
-        total = context.get("total_co2e_kg", 0.0)
-        hotspots = context.get("top_hotspots", {})
-        top_cat = next(iter(hotspots.keys()), "none")
-        answer_text = (
-            f"[{self._model}] Total recorded footprint is {total} kg CO2e "
-            f"(primary hotspot: {top_cat})."
-        )
+        answer_text = None
+        if self._client.is_available():
+            messages = self._prompt_builder.chat_messages(context, user_msg.get_content(), earlier)
+            try:
+                answer_text = self._client.complete(messages)
+            except RuntimeError:
+                answer_text = None  # fall back to the offline answer below
+        if answer_text is None:
+            answer_text = self._offline_answer(context)
+
         reply = ChatMessage(user_id=user.get_id(), sender="assistant", content=answer_text)
         self._history.append(reply)
         return reply
+
+    def _offline_answer(self, context: dict) -> str:
+        """Answer built only from the aggregated figures, used when OpenAI is not available."""
+        total = context.get("total_co2e_kg", 0.0)
+        hotspots = context.get("top_hotspots", {})
+        top_cat = next(iter(hotspots.keys()), "none")
+        return (
+            f"[{self.get_model()}] Total recorded footprint is {total} kg CO2e "
+            f"(primary hotspot: {top_cat})."
+        )
 
     def recommend(self, department_id: str, hotspots: dict[str, float]) -> list[Recommendation]:
         """UML method: creates structured department reduction Recommendations from hotspots."""
