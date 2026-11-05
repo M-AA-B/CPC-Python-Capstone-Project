@@ -393,6 +393,108 @@ classDiagram
     StreamProcessor ..> TelemetryRecord : filters & transforms
 ```
 
+### Subsystem 3 Real-Time Insights (Junaid Ahmad · `7222074`)
+
+`app/ai_assistant/stream_insights.py` plugs S3 into the same framework. The S1 steps and the S3 steps form one pipeline with the overloaded `|` operator:
+
+```python
+ScopeFilter({1, 2, 3}) | MetricTonCO2eTransformer() | HotspotDetector() | RecommendationTrigger() | AISummaryAggregator()
+```
+
+1. **Abstract Base Class:** `StatefulProcessor(StreamProcessor)` adds the abstract methods `snapshot()` and `reset()` for processors that remember the stream.
+2. **Inheritance & Polymorphism:** `HotspotDetector`, `RecommendationTrigger` and `AISummaryAggregator` each implement `process()`, `snapshot()` and `reset()` differently; `LiveCoachMonitor.reset()` resets them all through the same call.
+3. **Operator Overloading:** S3 steps join S1 steps with `|`; `HotspotAlert` overloads `<` and `==`, so `sorted(alerts)` / `max(alerts)` order alerts by severity.
+4. **Iterators & Generators:** `AlertFeed` implements `__iter__` / `__next__` (each alert delivered once); `LiveCoachMonitor.watch(stream)` is a generator that yields each alert as soon as its event is processed.
+
+What each S3 step does:
+
+- `HotspotDetector` flags an event above a CO₂e threshold, or the event that pushes its department over budget.
+- `RecommendationTrigger` turns the first hotspot per department and source into an S3 `Recommendation`.
+- `AISummaryAggregator` keeps running totals per category, scope and department. Only these totals go to the AI coach (`PromptBuilder.build_context`), never raw events.
+
+```mermaid
+classDiagram
+    class StreamProcessor {
+        <<abstract>>
+        +process(record)* TelemetryRecord
+        +__or__(other) CompositeStreamProcessor
+        +process_stream(stream) Iterator
+    }
+
+    class StatefulProcessor {
+        <<abstract>>
+        +snapshot()* dict
+        +reset()* None
+    }
+
+    class HotspotDetector {
+        -float _event_threshold_t
+        -float _department_budget_t
+        -dict _totals_t
+        -AlertFeed _feed
+        +get_event_threshold_t() float
+        +set_event_threshold_t(tons) None
+        +get_department_budget_t() float
+        +set_department_budget_t(tons) None
+        +alerts() AlertFeed
+        +process(record) TelemetryRecord
+    }
+
+    class RecommendationTrigger {
+        -float _saving_share
+        -dict _recommendations
+        +get_saving_share() float
+        +set_saving_share(share) None
+        +get_recommendations() list
+        +process(record) TelemetryRecord
+    }
+
+    class AISummaryAggregator {
+        -dict _by_category_kg
+        -dict _by_scope_kg
+        -dict _by_department_kg
+        -int _events
+        +category_totals() dict
+        +process(record) TelemetryRecord
+        +__len__() int
+    }
+
+    class AlertFeed {
+        -list _pending
+        +push(alert) None
+        +__iter__() AlertFeed
+        +__next__() HotspotAlert
+    }
+
+    class HotspotAlert {
+        -str _department
+        -str _source
+        -float _co2e_t
+        -str _reason
+        +__lt__(other) bool
+        +__eq__(other) bool
+        +__str__() str
+    }
+
+    class LiveCoachMonitor {
+        -CompositeStreamProcessor _pipeline
+        +watch(stream) Iterator
+        +reset() None
+    }
+
+    StreamProcessor <|-- StatefulProcessor
+    StatefulProcessor <|-- HotspotDetector
+    StatefulProcessor <|-- RecommendationTrigger
+    StatefulProcessor <|-- AISummaryAggregator
+    HotspotDetector "1" *-- "1" AlertFeed
+    AlertFeed "1" o-- "*" HotspotAlert
+    RecommendationTrigger ..> Recommendation : creates
+    LiveCoachMonitor *-- HotspotDetector
+    LiveCoachMonitor *-- RecommendationTrigger
+    LiveCoachMonitor *-- AISummaryAggregator
+    AISummaryAggregator ..> PromptBuilder : category totals
+```
+
 ### 5-Minute Walkthrough Video
 
 - **Video Link:**
@@ -401,4 +503,11 @@ classDiagram
 
 ```bash
 python demo_stream.py
+```
+
+Subsystem 3 live insights (alerts, recommendations, AI summary):
+
+```bash
+python demo_s3_stream.py
+python -m unittest discover tests
 ```
