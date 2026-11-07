@@ -4,6 +4,8 @@
 
 This branch (`HomeworkAssignment2`) builds on `Homeassignment1` by adding our event-driven **Real-Time Telemetry Stream Processing** framework (`app/data_collection/stream_processing.py`) on top of the OOP subsystem classes of our Group 13 Capstone Project UML class diagrams across all three subsystems. Every class implements explicit state initialization (`__init__`), configuration/setup methods, and encapsulated getters & setters with domain validation.
 
+# Video Link: https://drive.google.com/file/d/1GtoecjBTKAF1Ownqjzxyy-tPLzlgtC9f
+
 ---
 
 ## Team Overview
