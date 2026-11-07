@@ -4,6 +4,8 @@
 
 Our platform helps small and mid-sized enterprises record operational activities across Scopes 1–3, stream real-time telemetry into metric tons of CO₂e, visualize emissions and Carbon Score progress on an interactive dashboard, and receive department-tailored reduction recommendations from an AI Sustainability Coach.
 
+# Video Link: https://drive.google.com/file/d/1rdvxHfZwUQ5P8bO8CM_qvj3MuijpoXvl
+
 ---
 
 ## Team Overview & Student Identification
@@ -332,10 +334,6 @@ classDiagram
     TelemetryStream "1" o-- "*" TelemetryRecord : yields
     StreamProcessor ..> TelemetryRecord : transforms
 ```
-
-### 5-Minute Walkthrough Video (Hometask 2)
-
-- **Video Link:**
 
 ---
 
