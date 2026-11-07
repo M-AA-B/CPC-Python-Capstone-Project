@@ -4,6 +4,8 @@
 
 This branch (`Homeassignment1`) contains the pure Object-Oriented Programming (OOP) translation of our Group 13 Capstone Project UML class diagrams across all three subsystems. Every class implements explicit state initialization (`__init__`), configuration/setup methods, and encapsulated getters & setters with domain validation.
 
+# Video Link: https://drive.google.com/file/d/1Oq21MxRm5LgsDqt99bTTaBOb2xF9PNdX
+
 ---
 
 ## Team Overview
@@ -328,3 +330,5 @@ python -m unittest discover tests
 ```
 
 `demo_s3.py` runs offline. To let the S3 coach answer through OpenAI, `pip install openai` and set `OPENAI_API_KEY`.
+
+
