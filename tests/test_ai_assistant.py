@@ -65,7 +65,7 @@ def test_base_url_points_the_sdk_at_a_compatible_api(app, demo, monkeypatch):
     monkeypatch.setattr("app.ai_assistant.services.openai.OpenAI",
                         lambda **kwargs: seen.update(kwargs) or FakeOpenAI())
     gemini = "https://generativelanguage.googleapis.com/v1beta/openai/"
-    app.config.update(OPENAI_API_KEY="gemini-key", OPENAI_BASE_URL=gemini, OPENAI_MODEL="gemini-2.5-flash")
+    app.config.update(OPENAI_API_KEY="gemini-key", OPENAI_BASE_URL=gemini, OPENAI_MODEL="gemini-flash-lite-latest")
     ask("manager@demo.de")
     assert seen["base_url"] == gemini and seen["api_key"] == "gemini-key"
 

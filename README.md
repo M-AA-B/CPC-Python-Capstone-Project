@@ -392,7 +392,7 @@ OPENAI_API_KEY=your-openai-api-key
 ```env
 OPENAI_API_KEY=your-gemini-api-key
 OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
-OPENAI_MODEL=gemini-2.5-flash
+OPENAI_MODEL=gemini-flash-lite-latest
 ```
 
 Leave `OPENAI_BASE_URL` empty to use OpenAI (`gpt-4o-mini`).
