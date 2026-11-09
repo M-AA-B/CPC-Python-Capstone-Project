@@ -12,7 +12,7 @@ from app.models.chat_message import ChatMessage
 from app.models.recommendation import Recommendation, Status
 from app.user_access.services import AuthService
 from s3_helpers import (  # noqa: F401
-    app, demo, demo_data, fake_openai, get_department, get_user, login, month_start, no_api_key, post,
+    FakeOpenAI, app, demo, demo_data, fake_openai, get_department, get_user, login, month_start, no_api_key, post,
 )
 
 TIPS_JSON = json.dumps({"recommendations": [
@@ -49,6 +49,25 @@ def test_model_and_token_limit_come_from_config(app, demo, fake_openai):
     call = fake_openai.calls[0]
     assert call["model"] == "test-model"
     assert call["max_completion_tokens"] == 123
+
+
+def test_openai_is_used_when_no_base_url_is_set(app, demo, monkeypatch):
+    seen = {}
+    monkeypatch.setattr("app.ai_assistant.services.openai.OpenAI",
+                        lambda **kwargs: seen.update(kwargs) or FakeOpenAI())
+    app.config["OPENAI_API_KEY"] = "test-key"
+    ask("manager@demo.de")
+    assert seen["base_url"] is None
+
+
+def test_base_url_points_the_sdk_at_a_compatible_api(app, demo, monkeypatch):
+    seen = {}
+    monkeypatch.setattr("app.ai_assistant.services.openai.OpenAI",
+                        lambda **kwargs: seen.update(kwargs) or FakeOpenAI())
+    gemini = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    app.config.update(OPENAI_API_KEY="gemini-key", OPENAI_BASE_URL=gemini, OPENAI_MODEL="gemini-flash-lite-latest")
+    ask("manager@demo.de")
+    assert seen["base_url"] == gemini and seen["api_key"] == "gemini-key"
 
 
 def test_default_model(demo, fake_openai):
