@@ -387,6 +387,16 @@ ANALYTICS_DEV_COMPANY_ID=123e4567-e89b-12d3-a456-426614174000
 OPENAI_API_KEY=your-openai-api-key
 ```
 
+**No paid OpenAI account?** The AI assistant uses the OpenAI Python SDK, and any OpenAI-compatible API works. For a free Google Gemini key (https://aistudio.google.com/apikey) add:
+
+```env
+OPENAI_API_KEY=your-gemini-api-key
+OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+OPENAI_MODEL=gemini-2.5-flash
+```
+
+Leave `OPENAI_BASE_URL` empty to use OpenAI (`gpt-4o-mini`).
+
 Seed the local sample company and emission factors, then start the server:
 
 ```bash

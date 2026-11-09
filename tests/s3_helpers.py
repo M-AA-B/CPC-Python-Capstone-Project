@@ -118,4 +118,5 @@ def fake_openai(app, monkeypatch):
 def no_api_key(app, monkeypatch):
     """Runs for every test that imports it: a real OPENAI_API_KEY on this computer is never used."""
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
     app.config["OPENAI_API_KEY"] = ""

@@ -8,6 +8,9 @@ Settings (environment / .env, never in git):
     OPENAI_API_KEY          required for real answers; without it the pages explain the setup
     OPENAI_MODEL            default gpt-4o-mini
     OPENAI_TIMEOUT          seconds, default 10
+    OPENAI_BASE_URL         optional; empty = OpenAI. Any OpenAI-compatible server works,
+                            e.g. Google Gemini (free tier):
+                            https://generativelanguage.googleapis.com/v1beta/openai/
     AI_MAX_TOKENS           per answer, default 600
     AI_DAILY_REQUEST_LIMIT  per company, default 200
 """
@@ -36,6 +39,7 @@ DEFAULTS = {
     "OPENAI_API_KEY": "",
     "OPENAI_MODEL": "gpt-4o-mini",
     "OPENAI_TIMEOUT": "10",
+    "OPENAI_BASE_URL": "",
     "AI_MAX_TOKENS": "600",
     "AI_DAILY_REQUEST_LIMIT": "200",
 }
@@ -65,15 +69,18 @@ class AIClient:
     """Encapsulates OpenAI API communication, rate limits, and token budgets (S3 & Hometask 1)."""
 
     def __init__(self, api_key: str, model: str, timeout: float = 10.0,
-                 max_tokens: int = 600, daily_limit: int = 200):
+                 max_tokens: int = 600, daily_limit: int = 200, base_url: str | None = None):
         """Constructor: Proper state initialization (Hometask 1)."""
         self._model = "gpt-4o-mini"
         self._timeout = 10.0
         self._max_tokens = 600
         self._daily_limit = 200
         self.configure(model=model, timeout=timeout, max_tokens=max_tokens, daily_limit=daily_limit)
-        # The key stays on the server; without one the assistant shows a message instead
-        self._client = openai.OpenAI(api_key=api_key, timeout=self._timeout, max_retries=1) if api_key else None
+        # The key stays on the server; without one the assistant shows a message instead.
+        # base_url=None means OpenAI itself; a URL points the same SDK at a compatible API (e.g. Gemini).
+        self._base_url = (base_url or "").strip() or None
+        self._client = openai.OpenAI(api_key=api_key, base_url=self._base_url, timeout=self._timeout,
+                                     max_retries=1) if api_key else None
 
     # --- Initialization / Setup Methods (Hometask 1) ---
     def configure(
@@ -101,7 +108,13 @@ class AIClient:
             float(_setting("OPENAI_TIMEOUT")),
             int(_setting("AI_MAX_TOKENS")),
             int(_setting("AI_DAILY_REQUEST_LIMIT")),
+            base_url=_setting("OPENAI_BASE_URL"),
         )
+
+    @property
+    def base_url(self) -> str | None:
+        """None = OpenAI; otherwise the OpenAI-compatible server in use (e.g. Gemini)."""
+        return self._base_url
 
     # --- Encapsulation: Getters & Setters (Hometask 1) ---
     @property
