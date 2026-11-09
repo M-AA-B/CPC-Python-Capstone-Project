@@ -1,11 +1,9 @@
-import os
 import secrets
 from datetime import date
 
 from flask import (
     Response,
     abort,
-    current_app,
     jsonify,
     redirect,
     render_template,
@@ -13,6 +11,10 @@ from flask import (
     session,
     url_for,
 )
+
+from flask_login import current_user
+from app.models.user import Role
+from app.user_access.permissions import require_role
 
 from app.extensions import db
 from app.models.company import Company
@@ -43,6 +45,7 @@ def handle_analytics_error(error: AnalyticsError):
 
 
 @bp.get("/")
+@require_role()
 def index():
     company = None
     summary = None
@@ -59,11 +62,12 @@ def index():
         "category": request.args.get("category", "").strip(),
     }
 
-    # S3 will replace development access with authenticated company access.
-    if current_app.debug:
-        company_id = os.getenv("ANALYTICS_DEV_COMPANY_ID")
-        if company_id:
-            company = db.session.get(Company, company_id)
+    if not current_user.company_id:
+        abort(403)
+
+    company = db.session.get(Company, current_user.company_id)
+    if company is None:
+        abort(403)
 
     target = (
         get_latest_target(company.id)
@@ -157,18 +161,12 @@ def index():
 
 
 @bp.route("/target", methods=["GET", "POST"])
+@require_role(Role.ADMIN, Role.MANAGER)
 def target_form():
-    # Target editing is restricted to development until S3 adds roles.
-    if not current_app.debug:
+    if not current_user.company_id:
         abort(403)
 
-    company_id = os.getenv("ANALYTICS_DEV_COMPANY_ID")
-    company = (
-        db.session.get(Company, company_id)
-        if company_id
-        else None
-    )
-
+    company = db.session.get(Company, current_user.company_id)
     if company is None:
         abort(403)
 
