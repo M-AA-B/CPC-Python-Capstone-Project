@@ -468,11 +468,11 @@ Follow these step-by-step instructions to get the application running.
    - **Database Management GUI (Adminer):** [http://localhost:3333](http://localhost:3333)
      - System: `PostgreSQL` | Server: `db` | Database: `carbon_tracker` | Username: `carbon_user` | Password: `password123`
 
-   > [!NOTE]
-   > **Testing CSV Upload (`test_records.csv` & `test_activities.csv`):**
-   > - The batch upload (`/activities/new`) supports human-friendly CSV headers (`company, department, factor_id, ...`).
-   > - **Company Match:** The `company` value in your CSV must match your currently logged-in company name (e.g. `Test Corp`). Uploading records for another company is blocked for multi-tenant isolation.
-   > - **Department Verification:** The `department` listed in the CSV must already exist in your company (e.g. `IT`). If a department does not exist (e.g. `Operations`), the upload will reject it with a clear error prompting you to create it first under **User Access** (`/auth/users`) as Admin.
+> [!NOTE]
+> **Testing CSV Upload (`test_records.csv` & `test_activities.csv`):**
+> - The batch upload (`/activities/new`) supports human-friendly CSV headers (`company, department, factor_id, ...`).
+> - **Company Match:** The `company` value in your CSV must match your currently logged-in company name (e.g. `Test Corp`). Uploading records for another company is blocked for multi-tenant isolation.
+> - **Department Verification:** The `department` listed in the CSV must already exist in your company (e.g. `IT`). If a department does not exist (e.g. `Operations`), the upload will reject it with a clear error prompting you to create it first under **User Access** (`/auth/users`) as Admin.
 
 5. **Run Automated Tests:**
    ```bash
