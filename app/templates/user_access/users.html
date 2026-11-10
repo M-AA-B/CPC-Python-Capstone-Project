@@ -21,10 +21,11 @@
 <section class="ua-card">
   <h2>Add a user</h2>
   {% if not departments %}
-    <p class="ua-muted">This company has no departments yet, so only admins can be added.</p>
+    <p class="ua-muted">This company has no departments yet. You can create a new department below while adding this user.</p>
   {% endif %}
   <form method="post" action="{{ url_for('access.users') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="add_user">
     <label for="email">Email</label>
     <input id="email" name="email" type="email" value="{{ values.get('email', '') }}" required maxlength="120">
     <label for="name">Name</label>
@@ -38,13 +39,53 @@
       {% endfor %}
     </select>
     <label for="department_id">Department</label>
-    <select id="department_id" name="department_id">
+    <select id="department_id" name="department_id" onchange="toggleNewDept(this.value)">
       <option value="">None (admins only)</option>
       {% for department in departments %}
         <option value="{{ department.id }}" {% if values.get('department_id') == department.id %}selected{% endif %}>{{ department.name }}</option>
       {% endfor %}
+      <option value="__new__" {% if values.get('department_id') == '__new__' or not departments %}selected{% endif %}>+ Add New Department...</option>
     </select>
+    <div id="new_dept_row" style="margin-top: 0.35rem; {% if values.get('department_id') != '__new__' and departments %}display: none;{% endif %}">
+      <label for="new_department_name">New Department Name</label>
+      <input id="new_department_name" name="new_department_name" placeholder="e.g. Logistics, Operations, Marketing" value="{{ values.get('new_department_name', '') }}" maxlength="255">
+    </div>
     <button type="submit">Add user</button>
   </form>
 </section>
+
+<section class="ua-card">
+  <h2>Company Departments</h2>
+  <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+    {% for department in departments %}
+      <span style="background: #e3efe9; color: #176749; padding: 0.3rem 0.75rem; border-radius: 999px; font-weight: 500; font-size: 0.85rem;">
+        🏢 {{ department.name }}
+      </span>
+    {% else %}
+      <p class="ua-muted">No departments created yet.</p>
+    {% endfor %}
+  </div>
+  <form method="post" action="{{ url_for('access.users') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="add_department">
+    <label for="department_name">Add another department</label>
+    <input id="department_name" name="department_name" placeholder="e.g. Logistics, Operations, Facilities" required maxlength="255">
+    <button type="submit">Create Department</button>
+  </form>
+</section>
+
+<script>
+function toggleNewDept(val) {
+  var row = document.getElementById('new_dept_row');
+  if (row) {
+    if (val === '__new__') {
+      row.style.display = 'block';
+      var inp = document.getElementById('new_department_name');
+      if (inp) inp.focus();
+    } else {
+      row.style.display = 'none';
+    }
+  }
+}
+</script>
 {% endblock %}

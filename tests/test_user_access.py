@@ -203,3 +203,31 @@ def test_cannot_add_user_to_other_companys_department(demo):
     with pytest.raises(AuthError, match="Unknown department"):
         AuthService.create_user(other_admin, "x@other.de", "secret123", Role.EMPLOYEE,
                                 get_department("Office").id)  # Office belongs to Demo GmbH
+
+
+def test_admin_can_add_user_with_new_department(demo, client):
+    login(client, "admin@demo.de")
+    response = post(client, "/auth/users", {
+        "email": "innovator@demo.de", "password": "secret123",
+        "role": Role.EMPLOYEE, "department_id": "__new__",
+        "new_department_name": "R&D",
+    })
+    assert response.status_code == 302
+    new_user = get_user("innovator@demo.de")
+    assert new_user is not None
+    assert new_user.department is not None
+    assert new_user.department.name == "R&D"
+    assert new_user.department.company_id == demo.company_id
+
+
+def test_admin_can_create_department_directly(demo, client):
+    login(client, "admin@demo.de")
+    response = post(client, "/auth/users", {
+        "action": "add_department",
+        "department_name": "Facilities",
+    })
+    assert response.status_code == 302
+    dept = get_department("Facilities")
+    assert dept is not None
+    assert dept.company_id == demo.company_id
+

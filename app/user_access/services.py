@@ -3,14 +3,17 @@
 Registration, login and user management. Page protection (require_role, CSRF)
 is in permissions.py.
 """
+from datetime import date
 import re
 
 from flask import render_template
 from flask_login import login_user, logout_user
 
 from app.extensions import db, login_manager
+from app.models.activity_record import ActivityRecord
 from app.models.company import Company
 from app.models.department import Department
+from app.models.target import Target
 from app.models.user import Role, User
 from app.user_access.permissions import csrf_token
 
@@ -68,26 +71,71 @@ class AuthService:
         db.session.add(company)
         db.session.flush()
 
+        dept_objects = []
         # dict.fromkeys removes duplicates but keeps the order
         for dept_name in dict.fromkeys(d.strip() for d in departments or [] if d.strip()):
-            db.session.add(Department(company_id=company.id, name=dept_name))
+            d = Department(company_id=company.id, name=dept_name)
+            db.session.add(d)
+            dept_objects.append(d)
 
-        user = User(company_id=company.id, email=email, name=(name or "").strip() or None,
+        db.session.flush()
+        first_dept_id = dept_objects[0].id if dept_objects else None
+
+        user = User(company_id=company.id, department_id=first_dept_id, email=email, name=(name or "").strip() or None,
                     role=Role.ADMIN)
         user.set_password(password)
         db.session.add(user)
+        db.session.flush()
+
+        # Create default reduction target so scoring is active once records are added
+        target = Target(
+            company_id=company.id,
+            baseline_start=date(2026, 8, 1),
+            baseline_end=date(2026, 8, 31),
+            period_start=date(2026, 10, 1),
+            period_end=date(2026, 10, 31),
+            reduction_percent=20.0,
+            data_complete=True,
+        )
+        db.session.add(target)
+
         db.session.commit()
         return user
 
     @classmethod
+    def create_department(cls, admin: User, name: str) -> Department:
+        """Create a new department for the admin's company."""
+        if not admin.has_role(Role.ADMIN):
+            raise AuthError("Only admins can add departments.")
+        name = (name or "").strip()
+        if not name:
+            raise AuthError("Department name cannot be empty.")
+        if len(name) > 255:
+            raise AuthError("Department name is too long.")
+        existing = db.session.scalar(
+            db.select(Department).filter_by(company_id=admin.company_id, name=name)
+        )
+        if existing:
+            return existing
+        dept = Department(company_id=admin.company_id, name=name)
+        db.session.add(dept)
+        db.session.commit()
+        return dept
+
+    @classmethod
     def create_user(cls, admin: User, email: str, password: str, role: str,
-                    department_id: str | None = None, name: str | None = None) -> User:
+                    department_id: str | None = None, name: str | None = None,
+                    new_department_name: str | None = None) -> User:
         """An admin adds a manager or employee (or another admin) to their own company."""
         if not admin.has_role(Role.ADMIN):
             raise AuthError("Only admins can add users.")
         email = cls._check_new_account(email, password)
         if role not in Role.ALL:
             raise AuthError("Unknown role.")
+
+        if new_department_name and new_department_name.strip():
+            dept = cls.create_department(admin, new_department_name.strip())
+            department_id = dept.id
 
         if department_id:
             department = db.session.get(Department, department_id)

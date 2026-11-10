@@ -9,6 +9,7 @@ from app.data_collection.exceptions import (
 from app.data_collection.validators import validate_activity_period, validate_unit_match
 from app.extensions import db
 from app.models.activity_record import ActivityRecord
+from app.models.company import Company
 from app.models.department import Department
 from app.models.emission_factor import EmissionFactor
 
@@ -73,16 +74,49 @@ def create_activity_record(data: dict, user_id: str | None = None) -> ActivityRe
     validate_activity_period(period_start, period_end)
 
     # 6. Department and company resolution with company isolation check
-    department_id = data.get('department_id')
-    company_id = data.get('company_id')
+    company_val = data.get('company') or data.get('company_name') or data.get('company_id')
+    expected_company_id = data.get('expected_company_id')
+    company_id = None
 
-    if department_id:
-        dept = db.session.get(Department, department_id)
-        if dept:
-            if company_id and dept.company_id and dept.company_id != company_id:
-                raise CompanyIsolationError(department_id, company_id)
-            if not company_id:
-                company_id = dept.company_id
+    if company_val:
+        comp = db.session.get(Company, str(company_val).strip())
+        if not comp:
+            comp = db.session.scalar(db.select(Company).filter(db.func.lower(Company.name) == str(company_val).strip().lower()))
+        if not comp:
+            raise ValidationError(f"Company '{company_val}' does not exist.")
+        company_id = comp.id
+        if expected_company_id and company_id != expected_company_id:
+            user_comp = db.session.get(Company, expected_company_id)
+            user_comp_name = user_comp.name if user_comp else expected_company_id
+            raise ValidationError(f"Company mismatch: file contains records for '{comp.name}', but you are logged into '{user_comp_name}'.")
+    elif expected_company_id:
+        company_id = expected_company_id
+    elif data.get('company_id'):
+        company_id = data.get('company_id')
+
+    dept_val = data.get('department') or data.get('department_name') or data.get('department_id')
+    department_id = None
+
+    if dept_val:
+        dept = db.session.get(Department, str(dept_val).strip())
+        if not dept:
+            query = db.select(Department).filter(db.func.lower(Department.name) == str(dept_val).strip().lower())
+            if company_id:
+                query = query.filter_by(company_id=company_id)
+            dept = db.session.scalar(query)
+
+        if not dept:
+            comp_obj = db.session.get(Company, company_id) if company_id else None
+            comp_name = comp_obj.name if comp_obj else (company_id or "company")
+            raise ValidationError(f"Department '{dept_val}' does not exist in {comp_name}. Please create it first.")
+
+        department_id = dept.id
+        if company_id and dept.company_id and dept.company_id != company_id:
+            raise CompanyIsolationError(department_id, company_id)
+        if not company_id:
+            company_id = dept.company_id
+    elif data.get('department_id'):
+        department_id = data.get('department_id')
 
     # 7. Category & scope resolution
     category = data.get('category') or factor.category

@@ -1,4 +1,5 @@
-company_id,department_id,factor_id,period_start,period_end,category,quantity,unit,factor_unit,factor_kg_co2e
-comp_001,1,1,2026-10-01,2026-10-01,electricity,1500.0,kWh,kWh,0.42
-comp_001,1,2,2026-10-02,2026-10-02,transport,450.0,km,km,0.15
-comp_001,2,3,2026-10-03,2026-10-03,fuel,200.0,m3,m3,2.10
+company,department,factor_id,period_start,period_end,category,quantity,unit,factor_unit,factor_kg_co2e
+new_company,IT,1,2026-08-01,2026-08-31,electricity,10000.0,kWh,kWh,0.42
+new_company,IT,1,2026-10-01,2026-10-31,electricity,6000.0,kWh,kWh,0.42
+new_company,IT,4,2026-10-02,2026-10-31,flight,2473.0,km,km,0.15
+new_company,Operations,2,2026-10-03,2026-10-31,natural_gas,500.0,m3,m3,2.03

@@ -41,7 +41,7 @@ class CsvImporter:
         """Accessor (getter) for number of successfully imported records."""
         return self._valid_count
 
-    def process(self, file_storage, user_id: str) -> dict:
+    def process(self, file_storage, user_id: str, company_id: str | None = None, department_id: str | None = None) -> dict:
         """Parses, validates, and imports records from an uploaded CSV file stream."""
         self.initialize_session()
 
@@ -64,7 +64,10 @@ class CsvImporter:
 
         for row_idx, row in enumerate(reader, start=1):
             try:
-                self.validate_and_save_row(row, user_id)
+                row_data = dict(row)
+                if company_id:
+                    row_data['expected_company_id'] = company_id
+                self.validate_and_save_row(row_data, user_id)
                 self._valid_count += 1
             except Exception as e:
                 self._error_log.append(f"Row {row_idx}: {str(e)}")

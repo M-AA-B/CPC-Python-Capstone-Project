@@ -11,7 +11,10 @@ services:
       FLASK_DEBUG: "1"
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-super-secure-12345}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-carbon_user}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-carbon_tracker}
+      ANALYTICS_DEV_COMPANY_ID: ${ANALYTICS_DEV_COMPANY_ID:-123e4567-e89b-12d3-a456-426614174000}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
     depends_on:
       db:
         condition: service_healthy

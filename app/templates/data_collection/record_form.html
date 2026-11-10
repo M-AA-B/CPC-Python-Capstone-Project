@@ -23,17 +23,47 @@
             <h3 style="margin-top: 0; color: #111827; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem;">New Activity Record</h3>
             <form method="POST" action="{{ url_for('data.handle_form_submission') }}">
                 <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                    <!-- User Name -->
                     <div style="flex: 1;">
-                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">User ID</label>
-                        <input type="text" name="current_user_id" value="user-123" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 0.25rem;">
+                            User Name
+                            {% if current_user.is_authenticated and current_user.has_role('admin') %}
+                                <span style="color: #059669; font-weight: normal; font-size: 0.75rem;">(Admin: Log under user)</span>
+                            {% endif %}
+                        </label>
+                        {% if current_user.is_authenticated and current_user.has_role('admin') and company_users %}
+                            <select name="current_user_id" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; background: white;">
+                                {% for u in company_users %}
+                                    <option value="{{ u.id }}" {% if u.id == current_user.id %}selected{% endif %}>
+                                        {{ u.name or u.email }} ({{ u.role|title }}){% if u.id == current_user.id %} - You{% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        {% else %}
+                            <input type="text" value="{{ (current_user.name or current_user.email) if current_user.is_authenticated else 'Test User' }}" readonly disabled style="width: 100%; padding: 0.5rem; background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; cursor: not-allowed;">
+                            <input type="hidden" name="current_user_id" value="{{ current_user.id if current_user.is_authenticated else 'user-123' }}">
+                        {% endif %}
                     </div>
+                    <!-- Company (Workspace, Read-Only) -->
                     <div style="flex: 1;">
-                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">Company ID</label>
-                        <input type="text" name="company_id" value="123e4567-e89b-12d3-a456-426614174000" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 0.25rem;">Company</label>
+                        <input type="text" value="{{ current_user.company.name if current_user.is_authenticated and current_user.company else 'Test Corp' }}" readonly disabled style="width: 100%; padding: 0.5rem; background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; cursor: not-allowed;">
+                        <input type="hidden" name="company_id" value="{{ current_user.company_id if current_user.is_authenticated and current_user.company_id else '123e4567-e89b-12d3-a456-426614174000' }}">
                     </div>
+                    <!-- Department (Selection) -->
                     <div style="flex: 1;">
-                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">Department ID</label>
-                        <input type="text" name="department_id" value="123e4567-e89b-12d3-a456-426614174001" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 0.25rem;">Department</label>
+                        <select name="department_id" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; background: white;">
+                            {% if current_user.is_authenticated and current_user.company and current_user.company.departments %}
+                                {% for d in current_user.company.departments %}
+                                    <option value="{{ d.id }}" {% if current_user.department_id == d.id %}selected{% endif %}>{{ d.name }}</option>
+                                {% endfor %}
+                            {% else %}
+                                <option value="123e4567-e89b-12d3-a456-426614174001" selected>IT</option>
+                                <option value="1">HQ</option>
+                                <option value="2">Operations</option>
+                            {% endif %}
+                        </select>
                     </div>
                 </div>
 
@@ -71,12 +101,9 @@
 
                 <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
                     <div style="flex: 1;">
-                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">Emission Factor ID</label>
-                        <input type="number" name="factor_id" id="factorIdInput" value="1" oninput="updateRealtimePreview()" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
-                    </div>
-                    <div style="flex: 1;">
-                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">Factor kg CO2e / unit</label>
-                        <input type="number" step="any" name="factor_kg_co2e" id="factorValInput" value="0.42" oninput="updateRealtimePreview()" required style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+                        <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151;">Factor Rate (kg CO₂e / unit)</label>
+                        <input type="number" step="any" name="factor_kg_co2e" id="factorValInput" value="0.42" readonly style="width: 100%; padding: 0.5rem; background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box;">
+                        <input type="hidden" name="factor_id" id="factorIdInput" value="1">
                         <input type="hidden" name="factor_unit" id="factorUnitInput" value="kWh">
                     </div>
                 </div>
@@ -100,11 +127,12 @@
                 Upload multiple activity records at once. Required headers: <code>department_id, emission_factor_id, activity_value, unit, date, scope</code>.
             </p>
             <form method="POST" action="{{ url_for('data.upload_csv') }}" enctype="multipart/form-data" style="margin-top: auto;">
+                <input type="hidden" name="from_ui" value="1">
+                <input type="hidden" name="current_user_id" value="{{ current_user.id if current_user.is_authenticated else 'user-123' }}">
                 <div style="margin-bottom: 1rem;">
                     <label style="display: block; font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 0.5rem;">Select CSV File</label>
                     <input type="file" name="file" accept=".csv" required style="width: 100%; padding: 0.5rem; border: 1px dashed #9ca3af; border-radius: 4px; box-sizing: border-box;">
                 </div>
-                <input type="hidden" name="current_user_id" value="user-123">
                 <button type="submit" style="width: 100%; padding: 0.75rem; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
                     Upload CSV File
                 </button>
@@ -125,12 +153,13 @@
                     <thead>
                         <tr style="background: #f9fafb; border-bottom: 2px solid #e5e7eb; color: #374151;">
                             <th style="padding: 0.75rem;">Date</th>
+                            <th style="padding: 0.75rem;">Logged By</th>
+                            <th style="padding: 0.75rem;">Department</th>
                             <th style="padding: 0.75rem;">Category</th>
                             <th style="padding: 0.75rem;">Scope</th>
                             <th style="padding: 0.75rem;">Quantity</th>
                             <th style="padding: 0.75rem;">Unit</th>
                             <th style="padding: 0.75rem;">Calculated CO2e</th>
-                            <th style="padding: 0.75rem;">User</th>
                             <th style="padding: 0.75rem; text-align: right;">Action</th>
                         </tr>
                     </thead>
@@ -138,12 +167,13 @@
                         {% for r in records %}
                             <tr style="border-bottom: 1px solid #e5e7eb;">
                                 <td style="padding: 0.75rem;">{{ r.period_start or r.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td style="padding: 0.75rem; color: #4b5563;">{{ (r.creator.name or r.creator.email) if r.creator else (r.created_by or '—') }}</td>
+                                <td style="padding: 0.75rem; font-weight: 500; color: #374151;">{{ r.department.name if r.department else (r.department_id or '—') }}</td>
                                 <td style="padding: 0.75rem; text-transform: capitalize;">{{ r.category }}</td>
                                 <td style="padding: 0.75rem;"><span style="background: #e0e7ff; color: #3730a3; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600;">Scope {{ r.scope or 1 }}</span></td>
                                 <td style="padding: 0.75rem;">{{ r.quantity }}</td>
                                 <td style="padding: 0.75rem;">{{ r.unit }}</td>
                                 <td style="padding: 0.75rem; font-weight: bold; color: #059669;">{{ r.co2e_kg }} kg</td>
-                                <td style="padding: 0.75rem; color: #6b7280;">{{ r.created_by }}</td>
                                 <td style="padding: 0.75rem; text-align: right;">
                                     <button onclick="deleteRecord('{{ r.id }}')" style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">
                                         Delete
@@ -173,27 +203,33 @@ function onCategoryChange() {
     const unitInput = document.getElementById('unitInput');
     const factorValInput = document.getElementById('factorValInput');
     const factorUnitInput = document.getElementById('factorUnitInput');
+    const factorIdInput = document.getElementById('factorIdInput');
 
     if (cat === 'electricity') {
         unitInput.value = 'kWh';
         factorValInput.value = '0.42';
         factorUnitInput.value = 'kWh';
+        if (factorIdInput) factorIdInput.value = '1';
     } else if (cat === 'natural_gas') {
         unitInput.value = 'm3';
         factorValInput.value = '2.03';
         factorUnitInput.value = 'm3';
+        if (factorIdInput) factorIdInput.value = '2';
     } else if (cat === 'company_vehicles') {
         unitInput.value = 'liters';
         factorValInput.value = '2.68';
         factorUnitInput.value = 'liters';
+        if (factorIdInput) factorIdInput.value = '3';
     } else if (cat === 'business_travel') {
         unitInput.value = 'km';
-        factorValInput.value = '0.18';
+        factorValInput.value = '0.15';
         factorUnitInput.value = 'km';
+        if (factorIdInput) factorIdInput.value = '4';
     } else if (cat === 'waste') {
         unitInput.value = 'kg';
-        factorValInput.value = '0.52';
+        factorValInput.value = '0.50';
         factorUnitInput.value = 'kg';
+        if (factorIdInput) factorIdInput.value = '5';
     }
     updateRealtimePreview();
 }
@@ -204,7 +240,7 @@ async function deleteRecord(recordId) {
         const res = await fetch(`/activities/api/records/${recordId}`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: 'user-123' })
+            body: JSON.stringify({ user_id: '{{ current_user.id if current_user.is_authenticated else "user-123" }}' })
         });
         if (res.ok) {
             window.location.reload();

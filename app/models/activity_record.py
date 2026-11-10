@@ -23,6 +23,8 @@ class ActivityRecord(db.Model):
     created_by = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
+    creator = db.relationship('User', foreign_keys=[created_by], lazy=True)
+
     # Synonyms / Aliases to support both naming conventions
     emission_factor_id = db.synonym('factor_id')
     user_id = db.synonym('created_by')

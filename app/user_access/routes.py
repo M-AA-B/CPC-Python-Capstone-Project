@@ -85,14 +85,31 @@ def users():
     if request.method == "POST":
         check_csrf()
         form = request.form
+        action = form.get("action", "add_user")
+
+        if action == "add_department":
+            dept_name = (form.get("department_name") or "").strip()
+            try:
+                AuthService.create_department(current_user, dept_name)
+                flash(f"Department '{dept_name}' created successfully.", "success")
+            except AuthError as error:
+                flash(str(error), "danger")
+            return redirect(url_for("access.users"))
+
         try:
+            new_dept = form.get("new_department_name")
+            dept_id = form.get("department_id")
+            if dept_id == "__new__":
+                dept_id = None
+
             AuthService.create_user(
                 current_user,
                 form.get("email", ""),
                 form.get("password", ""),
                 form.get("role", ""),
-                form.get("department_id") or None,
+                dept_id or None,
                 name=form.get("name"),
+                new_department_name=new_dept,
             )
         except AuthError as error:
             flash(str(error), "danger")

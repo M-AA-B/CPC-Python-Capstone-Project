@@ -1,5 +1,6 @@
 import traceback
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask_login import current_user
 from app.data_collection.calculations import EmissionCalculator, calculate_emissions, assign_scope
 from app.data_collection.csv_import import CsvImporter
 from app.data_collection.exceptions import (
@@ -16,6 +17,8 @@ from app.data_collection.services import (
 )
 from app.extensions import db
 from app.models.emission_factor import EmissionFactor
+from app.models.user import Role, User
+from app.user_access.services import AuthService
 
 s1_bp = Blueprint('data', __name__, url_prefix='/activities')
 
@@ -30,13 +33,22 @@ def handle_s1_error(error):
 @s1_bp.route('/form', methods=['GET'])
 def index():
     """Renders the HTML data entry form interface with existing records and active factors."""
+    company_users = []
     try:
-        records = get_activity_records()
+        if current_user.is_authenticated and current_user.company_id:
+            records = get_activity_records({'company_id': current_user.company_id})
+            if current_user.has_role(Role.ADMIN):
+                company_users = AuthService.company_users(current_user.company_id)
+        else:
+            records = get_activity_records()
         factors = EmissionFactor.query.all()
     except Exception:
         records = []
         factors = []
-    return render_template('data_collection/record_form.html', records=records, factors=factors)
+    return render_template('data_collection/record_form.html',
+                           records=records,
+                           factors=factors,
+                           company_users=company_users)
 
 
 @s1_bp.route('/api/records', methods=['GET'])
@@ -184,6 +196,15 @@ def handle_form_submission():
         "factor_kg_co2e": request.form.get('factor_kg_co2e', 0.42)
     }
     user_id = request.form.get('current_user_id') or request.form.get('user_id', 'user-123')
+    if current_user.is_authenticated and current_user.company_id:
+        data["company_id"] = current_user.company_id
+        user_id = current_user.id
+        if current_user.has_role(Role.ADMIN):
+            target_user_id = request.form.get('current_user_id')
+            if target_user_id:
+                target_user = db.session.get(User, target_user_id)
+                if target_user and target_user.company_id == current_user.company_id:
+                    user_id = target_user.id
     
     try:
         record = create_activity_record(data, user_id)
@@ -198,22 +219,46 @@ def handle_form_submission():
 @s1_bp.route('/api/records/upload-csv', methods=['POST'])
 def upload_csv():
     """Processes bulk activity records uploaded via CSV file using CsvImporter service (Hometask 1)."""
+    is_ui_request = request.form.get('from_ui') == '1' or (
+        request.accept_mimetypes.accept_html and not request.is_json and request.headers.get("Accept") != "*/*"
+    )
+
     if 'file' not in request.files:
+        if is_ui_request:
+            flash("No file selected for upload.", "danger")
+            return redirect(url_for('data.index'))
         return jsonify({"error": "No file part in the request"}), 400
     
     file = request.files['file']
     if file.filename == '':
+        if is_ui_request:
+            flash("No selected file.", "danger")
+            return redirect(url_for('data.index'))
         return jsonify({"error": "No selected file"}), 400
     
-    user_id = request.form.get('user_id') or request.form.get('current_user_id', 'user-123')
-    
+    user_id = request.form.get('current_user_id') or request.form.get('user_id') or (current_user.id if current_user.is_authenticated else 'user-123')
+    target_company = current_user.company_id if (is_ui_request and current_user.is_authenticated and current_user.company_id) else None
+
     try:
         importer = CsvImporter()
-        result = importer.process(file, user_id)
+        result = importer.process(file, user_id, company_id=target_company)
         status_code = 201 if result["inserted"] > 0 else 400
+
+        if is_ui_request:
+            if result["inserted"] > 0 and not result["errors"]:
+                flash(f"CSV Upload Successful! Processed {result['inserted']} records.", "success")
+            elif result["inserted"] > 0 and result["errors"]:
+                flash(f"Processed {result['inserted']} records with errors: {'; '.join(result['errors'][:2])}", "warning")
+            else:
+                flash(f"Upload failed: {'; '.join(result['errors'][:2])}", "danger")
+            return redirect(url_for('data.index'))
+
         return jsonify({
             "message": f"Processed {result['inserted']} records successfully.",
             "errors": result["errors"]
         }), status_code
     except Exception as e:
+        if is_ui_request:
+            flash(f"Failed to parse CSV file: {str(e)}", "danger")
+            return redirect(url_for('data.index'))
         return jsonify({"error": f"Failed to parse CSV file: {str(e)}"}), 400

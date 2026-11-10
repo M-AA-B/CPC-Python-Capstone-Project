@@ -19,6 +19,7 @@ import json
 import logging
 import os
 from datetime import date, datetime, time, timedelta, timezone
+from typing import Any
 
 import openai
 from flask import current_app
@@ -78,6 +79,7 @@ class AIClient:
         self.configure(model=model, timeout=timeout, max_tokens=max_tokens, daily_limit=daily_limit)
         # The key stays on the server; without one the assistant shows a message instead.
         # base_url=None means OpenAI itself; a URL points the same SDK at a compatible API (e.g. Gemini).
+        api_key = (api_key or "").strip()
         self._base_url = (base_url or "").strip() or None
         self._client = openai.OpenAI(api_key=api_key, base_url=self._base_url, timeout=self._timeout,
                                      max_retries=1) if api_key else None
@@ -178,9 +180,10 @@ class AIClient:
 
         log = AIRequest(company_id=company_id, user_id=user_id, kind=kind)
         db.session.add(log)
+        client: Any = self._client
         try:
             extra = {"response_format": {"type": "json_object"}} if json_output else {}
-            response = self._client.chat.completions.create(
+            response = client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 max_completion_tokens=self.max_tokens,
@@ -343,7 +346,7 @@ class AIAssistant:
             db.select(ChatMessage).filter_by(user_id=user_id)
             .order_by(ChatMessage.created_at.desc()).limit(limit)
         ).all()
-        return newest_first[::-1]
+        return list(reversed(newest_first))
 
     def ask(self, user, question: str) -> ChatMessage:
         """Answer a question about the user's company emissions. Saves question and answer."""

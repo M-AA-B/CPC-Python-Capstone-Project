@@ -98,6 +98,52 @@ def test_csv_batch_upload_success(app, client):
     assert response.status_code == 201
     assert response.get_json()["message"] == "Processed 1 records successfully."
 
+
+def test_csv_rejects_unknown_company(app):
+    with app.app_context():
+        from app.data_collection.csv_import import CsvImporter
+        csv_content = (
+            "company,department,emission_factor_id,activity_value,unit,date,scope\n"
+            "Nonexistent Co,Operations,999,100,kWh,2026-03-03,2\n"
+        )
+        importer = CsvImporter()
+        res = importer.process(io.BytesIO(bytes(csv_content, "utf-8")), "user_test")
+        assert res["inserted"] == 0
+        assert any("does not exist" in e for e in res["errors"])
+
+
+def test_csv_rejects_mismatched_company(app):
+    with app.app_context():
+        from app.data_collection.csv_import import CsvImporter
+        # company 'Test Eco Corp' exists with id 'comp_test'
+        # user belongs to another company 'other_comp'
+        other_comp = Company(id="other_comp", name="Other Corp")
+        db.session.add(other_comp)
+        db.session.commit()
+
+        csv_content = (
+            "company,department,emission_factor_id,activity_value,unit,date,scope\n"
+            "Test Eco Corp,Operations,999,100,kWh,2026-03-03,2\n"
+        )
+        importer = CsvImporter()
+        res = importer.process(io.BytesIO(bytes(csv_content, "utf-8")), "user_test", company_id="other_comp")
+        assert res["inserted"] == 0
+        assert any("Company mismatch" in e for e in res["errors"])
+
+
+def test_csv_rejects_nonexistent_department(app):
+    with app.app_context():
+        from app.data_collection.csv_import import CsvImporter
+        csv_content = (
+            "company,department,emission_factor_id,activity_value,unit,date,scope\n"
+            "Test Eco Corp,UnknownDept,999,100,kWh,2026-03-03,2\n"
+        )
+        importer = CsvImporter()
+        res = importer.process(io.BytesIO(bytes(csv_content, "utf-8")), "user_test", company_id="comp_test")
+        assert res["inserted"] == 0
+        assert any("does not exist" in e for e in res["errors"])
+
+
 def test_delete_record_ownership(app, client):
     with app.app_context():
         record = ActivityRecord(
