@@ -9,10 +9,13 @@
   <header class="dashboard__header">
     <h1>Emissions Dashboard</h1>
     <p>Explore emissions, compare trends and track reduction targets.</p>
-    <p><strong>Development:</strong> Showing local test data.</p>
+
+    {% if company %}
+      <p>Company: {{ company.name }}</p>
+    {% endif %}
+
   </header>
 
-  <!-- Filters will become functional when connected to analytics. -->
 <form method="get" action="{{ url_for('analytics.index') }}">
   <fieldset>
     <legend>Filter emissions</legend>
@@ -283,7 +286,7 @@
         <p>No target set.</p>
       {% endif %}
 
-      {% if company is not none and config.DEBUG %}
+      {% if company is not none and current_user.has_role('admin', 'manager') %}
         <a href="{{ url_for('analytics.target_form') }}">
           {% if target %}Set a new target{% else %}Set target{% endif %}
         </a>

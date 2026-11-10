@@ -5,4 +5,10 @@ def test_health(client):
 
 @pytest.mark.parametrize("path", ["/", "/activities/", "/analytics/", "/auth/", "/assistant/"])
 def test_starter_pages(client, path):
-    assert client.get(path).status_code == 200
+    response = client.get(path)
+
+    if path == "/analytics/":
+        assert response.status_code == 302
+        assert "/auth/login" in response.headers["Location"]
+    else:
+        assert response.status_code == 200

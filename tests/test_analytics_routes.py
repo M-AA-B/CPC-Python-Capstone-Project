@@ -6,19 +6,33 @@ import pytest
 from app.extensions import db
 from app.models.company import Company
 from app.models.target import Target
+from app.models.user import Role, User
+from s3_helpers import PASSWORD, login
 
 
 @pytest.fixture()
-def analytics_client(client, monkeypatch):
-    monkeypatch.setenv("ANALYTICS_DEV_COMPANY_ID", "route-company")
-    client.application.config["DEBUG"] = True
+def analytics_client(client):
+    client.application.config["DEBUG"] = False
 
     with client.application.app_context():
-        db.session.add(
-            Company(id="route-company", name="Route Test Company")
+        company = Company(
+            id="route-company",
+            name="Route Test Company",
         )
+        db.session.add(company)
+        db.session.flush()
+
+        user = User(
+            id="route-admin",
+            email="admin@route.de",
+            company_id=company.id,
+            role=Role.ADMIN,
+        )
+        user.set_password(PASSWORD)
+        db.session.add(user)
         db.session.commit()
 
+    assert login(client, "admin@route.de").status_code == 302
     return client
 
 
@@ -84,6 +98,7 @@ def test_invalid_dates_do_not_download_csv(analytics_client):
         "&end_date=2026-04-01&export=csv"
     )
 
+    assert response.status_code == 200
     assert response.mimetype == "text/html"
     assert "Content-Disposition" not in response.headers
     assert (
@@ -121,6 +136,7 @@ def test_invalid_target_is_not_saved(analytics_client):
 
     response = analytics_client.post("/analytics/target", data=data)
 
+    assert response.status_code == 200
     assert "Reduction must be" in response.get_data(as_text=True)
 
     with analytics_client.application.app_context():
@@ -139,8 +155,64 @@ def test_target_rejects_missing_csrf_token(analytics_client):
         assert db.session.execute(db.select(Target)).scalars().all() == []
 
 
-def test_target_editing_disabled_outside_debug_mode(analytics_client):
-    analytics_client.application.config["DEBUG"] = False
+@pytest.mark.parametrize("role", [Role.ADMIN, Role.MANAGER])
+def test_authorized_roles_can_save_target_without_debug_mode(
+    analytics_client, role
+):
+    with analytics_client.application.app_context():
+        user = db.session.get(User, "route-admin")
+        user.role = role
+        db.session.commit()
 
-    assert analytics_client.get("/analytics/target").status_code == 403
-    assert analytics_client.post("/analytics/target").status_code == 403
+        data = target_form_data()
+        data["csrf_token"] = get_form_token(analytics_client)
+
+        response = analytics_client.post("/analytics/target", data=data)
+
+        assert response.status_code == 302
+
+        target = db.session.scalar(db.select(Target))
+        assert target is not None
+        assert target.company_id == "route-company"
+
+
+def test_employee_cannot_open_or_save_target(analytics_client):
+    with analytics_client.application.app_context():
+        user = db.session.get(User, "route-admin")
+        user.role = Role.EMPLOYEE
+        db.session.commit()
+
+        response = analytics_client.get("/analytics/target")
+        assert response.status_code == 403
+
+        response = analytics_client.post(
+            "/analytics/target",
+            data=target_form_data(),
+        )
+        assert response.status_code == 403
+
+        assert db.session.scalar(db.select(Target)) is None
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["/analytics/", "/analytics/?export=csv", "/analytics/target"],
+)
+def test_analytics_requires_login(client, url):
+    response = client.get(url)
+
+    assert response.status_code == 302
+    assert "/auth/login" in response.headers["Location"]
+
+
+def test_guest_cannot_save_target(client):
+    response = client.post(
+        "/analytics/target",
+        data=target_form_data(),
+    )
+
+    assert response.status_code == 302
+    assert "/auth/login" in response.headers["Location"]
+
+    with client.application.app_context():
+        assert db.session.scalar(db.select(Target)) is None
