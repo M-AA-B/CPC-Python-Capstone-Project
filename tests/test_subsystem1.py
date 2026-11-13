@@ -181,6 +181,10 @@ def test_delete_record_ownership(app, client):
     unauthorized_res = client.delete("/activities/api/records/rec_test_2", json={"user_id": "other_user"})
     assert unauthorized_res.status_code == 403
 
+    # Verify unauthenticated deletion without user_id returns 401
+    unauth_no_user = client.delete("/activities/api/records/rec_test_2", json={})
+    assert unauth_no_user.status_code == 401
+
 # --- Hometask 3: Web APIs & Data Output Layer ---
 
 def test_list_records_output_api(app, client):

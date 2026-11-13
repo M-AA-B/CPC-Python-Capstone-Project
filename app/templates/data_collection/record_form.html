@@ -240,7 +240,7 @@ async function deleteRecord(recordId) {
         const res = await fetch(`/activities/api/records/${recordId}`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: '{{ current_user.id if current_user.is_authenticated else "user-123" }}' })
+            body: JSON.stringify({ user_id: '{{ current_user.id if current_user.is_authenticated else "" }}' })
         });
         if (res.ok) {
             window.location.reload();

@@ -7,7 +7,7 @@ def test_health(client):
 def test_starter_pages(client, path):
     response = client.get(path)
 
-    if path == "/analytics/":
+    if path in ("/activities/", "/analytics/"):
         assert response.status_code == 302
         assert "/auth/login" in response.headers["Location"]
     else:

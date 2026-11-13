@@ -18,6 +18,7 @@ from app.data_collection.services import (
 from app.extensions import db
 from app.models.emission_factor import EmissionFactor
 from app.models.user import Role, User
+from app.user_access.permissions import check_csrf, require_role
 from app.user_access.services import AuthService
 
 s1_bp = Blueprint('data', __name__, url_prefix='/activities')
@@ -31,16 +32,14 @@ def handle_s1_error(error):
 
 @s1_bp.route('/', methods=['GET'])
 @s1_bp.route('/form', methods=['GET'])
+@require_role()
 def index():
     """Renders the HTML data entry form interface with existing records and active factors."""
     company_users = []
     try:
-        if current_user.is_authenticated and current_user.company_id:
-            records = get_activity_records({'company_id': current_user.company_id})
-            if current_user.has_role(Role.ADMIN):
-                company_users = AuthService.company_users(current_user.company_id)
-        else:
-            records = get_activity_records()
+        records = get_activity_records({'company_id': current_user.company_id})
+        if current_user.has_role(Role.ADMIN):
+            company_users = AuthService.company_users(current_user.company_id)
         factors = EmissionFactor.query.all()
     except Exception:
         records = []
@@ -120,7 +119,9 @@ def edit_record(record_id):
 def delete_record(record_id):
     """JSON API endpoint to delete an activity record with ownership check."""
     data = request.json or {}
-    user_id = data.get('user_id') or data.get('current_user_id')
+    user_id = (current_user.id if current_user.is_authenticated else None) or data.get('user_id') or data.get('current_user_id')
+    if not user_id:
+        return jsonify({"error": "Authentication or user ID is required"}), 401
     
     try:
         delete_activity_record(record_id, user_id)
@@ -181,10 +182,11 @@ def list_factors():
 
 
 @s1_bp.route('/submit', methods=['POST'])
+@require_role()
 def handle_form_submission():
     """Handles standard HTML form POST submissions."""
     data = {
-        "company_id": request.form.get('company_id'),
+        "company_id": current_user.company_id,
         "department_id": request.form.get('department_id'),
         "factor_id": request.form.get('factor_id', 1),
         "period_start": request.form.get('period_start'),
@@ -195,16 +197,13 @@ def handle_form_submission():
         "factor_unit": request.form.get('factor_unit', request.form.get('unit')),
         "factor_kg_co2e": request.form.get('factor_kg_co2e', 0.42)
     }
-    user_id = request.form.get('current_user_id') or request.form.get('user_id', 'user-123')
-    if current_user.is_authenticated and current_user.company_id:
-        data["company_id"] = current_user.company_id
-        user_id = current_user.id
-        if current_user.has_role(Role.ADMIN):
-            target_user_id = request.form.get('current_user_id')
-            if target_user_id:
-                target_user = db.session.get(User, target_user_id)
-                if target_user and target_user.company_id == current_user.company_id:
-                    user_id = target_user.id
+    user_id = current_user.id
+    if current_user.has_role(Role.ADMIN):
+        target_user_id = request.form.get('current_user_id')
+        if target_user_id:
+            target_user = db.session.get(User, target_user_id)
+            if target_user and target_user.company_id == current_user.company_id:
+                user_id = target_user.id
     
     try:
         record = create_activity_record(data, user_id)
