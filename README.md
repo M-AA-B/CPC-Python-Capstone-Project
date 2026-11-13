@@ -12,6 +12,9 @@
 
 An enterprise-grade sustainability platform empowering small and mid-sized enterprises (SMEs) to track greenhouse gas emissions across **GHG Protocol Scopes 1, 2, and 3**, stream live operational telemetry into metric tons of $\text{CO}_2\text{e}$, visualize reduction trajectories via an interactive Plotly dashboard, and receive department-tailored decarbonization advice from an AI Sustainability Coach.
 
+
+# Video Link: https://drive.google.com/file/d/1Ek4CloiGrVBfharDmpmS4hcEi9T_oLOd
+# Presentation Link: https://docs.google.com/presentation/d/17mpzvSi80Ict-nWRvPFCKuuzee0MTAoE
 ---
 
 ## 👥 Team Overview & Subsystem Ownership
